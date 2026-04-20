@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1440, initial-scale=1" />
+<title>Carrier · Install Base Intelligence</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><ellipse cx='32' cy='32' rx='30' ry='22' fill='%231a3d7a'/><ellipse cx='32' cy='32' rx='27' ry='19' fill='none' stroke='white' stroke-width='1.5'/><text x='32' y='39' font-family='Georgia,serif' font-style='italic' font-weight='500' font-size='18' fill='white' text-anchor='middle'>C</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,500;1,600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          serif: ['Playfair Display', 'Georgia', 'serif'],
+        },
+        colors: {
+          carrier: {
+            navy: '#0d1b2e',
+            navy2: '#0a1628',
+            navy3: '#162236',
+            blue: '#1a3d7a',
+            blueBright: '#2563eb',
+            gold: '#c8a04f',
+            goldDim: '#a08238',
+            page: '#f5f6f7',
+          },
+        },
+      },
+    },
+  };
+</script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; background: #f5f6f7; color: #0f172a; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .hairline { box-shadow: inset 0 -1px 0 #e2e8f0; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .hero-gradient { background: linear-gradient(135deg, #0d1b2e 0%, #162236 100%); }
+  /* Hide recharts tooltip default styling */
+  .recharts-default-tooltip { background: #0d1b2e !important; border: 0 !important; border-radius: 8px !important; color: white !important; padding: 8px 12px !important; font-size: 12px !important; }
+  .recharts-tooltip-label { color: #cbd5e1 !important; margin-bottom: 2px !important; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useMemo, Fragment } = React;
+const { LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
+
+/* ============================================================
+   SAMPLE DATA
+============================================================ */
+const DATA = {
+  territories: [
+    { id: 'T-106', name: 'Southern California', region: 'West',          installedUnits: 214300, unknownUnits: 31400, atRiskUnits: 10960, lapsedContracts: 12700, revenueOpp: 22.1, rank: 1 },
+    { id: 'T-108', name: 'Northeast Corridor',   region: 'Northeast',    installedUnits: 196800, unknownUnits: 26800, atRiskUnits:  9880, lapsedContracts: 11900, revenueOpp: 20.4, rank: 2 },
+    { id: 'T-101', name: 'Dallas-Fort Worth',    region: 'South Central',installedUnits: 182400, unknownUnits: 24900, atRiskUnits:  8340, lapsedContracts: 11200, revenueOpp: 18.6, rank: 3 },
+    { id: 'T-104', name: 'Orlando-Tampa',        region: 'Southeast',    installedUnits: 171600, unknownUnits: 22700, atRiskUnits:  8540, lapsedContracts: 10800, revenueOpp: 17.8, rank: 4 },
+    { id: 'T-102', name: 'Houston Gulf',         region: 'South Central',installedUnits: 163200, unknownUnits: 21500, atRiskUnits:  7910, lapsedContracts: 10400, revenueOpp: 16.9, rank: 5 },
+    { id: 'T-107', name: 'Chicago Great Lakes',  region: 'Midwest',      installedUnits: 158900, unknownUnits: 20100, atRiskUnits:  7120, lapsedContracts:  9400, revenueOpp: 15.1, rank: 6 },
+    { id: 'T-103', name: 'Atlanta Metro',        region: 'Southeast',    installedUnits: 149700, unknownUnits: 18200, atRiskUnits:  6880, lapsedContracts:  8900, revenueOpp: 14.2, rank: 7 },
+    { id: 'T-105', name: 'Phoenix Valley',       region: 'Southwest',    installedUnits: 136500, unknownUnits: 19600, atRiskUnits:  7430, lapsedContracts:  8100, revenueOpp: 13.5, rank: 8 },
+  ],
+  dealers: [
+    { id: 'D-204', name: 'SunState Field Solutions',   territory: 'Orlando-Tampa',        firstTimeFix: 67, repeatVisit: 22, avgCompletion: 3.6, partsReadiness: 59, attachRate: 35, rank: 1 },
+    { id: 'D-202', name: 'Gulf Mechanical Partners',   territory: 'Houston Gulf',         firstTimeFix: 69, repeatVisit: 20, avgCompletion: 3.1, partsReadiness: 64, attachRate: 38, rank: 4 },
+    { id: 'D-206', name: 'Pacific HVAC Alliance',      territory: 'Southern California',  firstTimeFix: 66, repeatVisit: 23, avgCompletion: 3.8, partsReadiness: 57, attachRate: 34, rank: 3 },
+    { id: 'D-201', name: 'Lone Star Climate Services', territory: 'Dallas-Fort Worth',    firstTimeFix: 71, repeatVisit: 18, avgCompletion: 2.8, partsReadiness: 68, attachRate: 41, rank: 2 },
+    { id: 'D-205', name: 'Desert Air Network',         territory: 'Phoenix Valley',       firstTimeFix: 74, repeatVisit: 15, avgCompletion: 2.5, partsReadiness: 76, attachRate: 43, rank: 5 },
+    { id: 'D-203', name: 'Peachtree Comfort Group',    territory: 'Atlanta Metro',        firstTimeFix: 75, repeatVisit: 16, avgCompletion: 2.4, partsReadiness: 73, attachRate: 44, rank: 6 },
+    { id: 'D-207', name: 'Great Lakes ServiceWorks',   territory: 'Chicago Great Lakes',  firstTimeFix: 73, repeatVisit: 17, avgCompletion: 2.7, partsReadiness: 71, attachRate: 42, rank: 7 },
+    { id: 'D-208', name: 'Northeast Mechanical Group', territory: 'Northeast Corridor',   firstTimeFix: 68, repeatVisit: 21, avgCompletion: 3.2, partsReadiness: 62, attachRate: 36, rank: 8 },
+  ],
+  accounts: [
+    { id: 'A-306', name: 'Pacific Cold Storage Network',      territory: 'Southern California', dealer: 'D-206', segment: 'Industrial',    units: 274, unknown: 48, contract: 'Lapsed',  upgradeCandidates: 35, revenueK: 980 },
+    { id: 'A-304', name: 'SunBelt School District Cluster',   territory: 'Orlando-Tampa',       dealer: 'D-204', segment: 'Public Sector', units: 310, unknown: 54, contract: 'Lapsed',  upgradeCandidates: 38, revenueK: 890 },
+    { id: 'A-302', name: 'Gulf Coast Logistics Hub',          territory: 'Houston Gulf',        dealer: 'D-202', segment: 'Light Commercial', units: 208, unknown: 33, contract: 'Lapsed',  upgradeCandidates: 27, revenueK: 610 },
+    { id: 'A-308', name: 'Northeast Life Sciences Campus',    territory: 'Northeast Corridor',  dealer: 'D-208', segment: 'Life Sciences', units: 156, unknown: 29, contract: 'Lapsed',  upgradeCandidates: 22, revenueK: 540 },
+    { id: 'A-307', name: 'Great Lakes Multi-Site Retail',     territory: 'Chicago Great Lakes', dealer: 'D-207', segment: 'Retail',        units: 185, unknown: 21, contract: 'Partial', upgradeCandidates: 19, revenueK: 460 },
+    { id: 'A-301', name: 'North Texas Medical Plaza',         territory: 'Dallas-Fort Worth',   dealer: 'D-201', segment: 'Light Commercial', units: 124, unknown: 19, contract: 'Partial', upgradeCandidates: 16, revenueK: 420 },
+    { id: 'A-305', name: 'Desert Valley Hospitality Group',   territory: 'Phoenix Valley',      dealer: 'D-205', segment: 'Hospitality',   units: 142, unknown: 15, contract: 'Partial', upgradeCandidates: 12, revenueK: 330 },
+    { id: 'A-303', name: 'Peachtree Retail Centers',          territory: 'Atlanta Metro',       dealer: 'D-203', segment: 'Mixed Retail',  units:  96, unknown: 11, contract: 'Active',  upgradeCandidates:  9, revenueK: 210 },
+  ],
+  units: [
+    { id: 'U-4006', serial: '24RT-SOC-77851', family: 'Packaged Rooftop Units',           model: 'RTU-60P-V3',    installDate: '2019-02-16', account: 'A-306', dealer: 'D-206', territory: 'Southern California', contract: 'Lapsed',  warranty: 'Expired', lastService: '2026-01-26', health: 45, risk: 'Critical' },
+    { id: 'U-4004', serial: '48VR-ORL-99210', family: 'Variable Refrigerant Flow Systems', model: 'VRF-72M',       installDate: '2018-08-03', account: 'A-304', dealer: 'D-204', territory: 'Orlando-Tampa',       contract: 'Lapsed',  warranty: 'Expired', lastService: '2025-12-22', health: 47, risk: 'Critical' },
+    { id: 'U-4008', serial: '30CC-NEC-10473', family: 'Commercial Chillers',              model: 'CH-95Z',        installDate: '2018-03-14', account: 'A-308', dealer: 'D-208', territory: 'Northeast Corridor',  contract: 'Lapsed',  warranty: 'Expired', lastService: '2026-01-31', health: 52, risk: 'High' },
+    { id: 'U-4001', serial: '24XA-DFW-88172', family: 'Packaged Rooftop Units',           model: 'RTU-48P-V2',    installDate: '2019-04-12', account: 'A-301', dealer: 'D-201', territory: 'Dallas-Fort Worth',   contract: 'Partial', warranty: 'Expired', lastService: '2026-02-08', health: 54, risk: 'High' },
+    { id: 'U-4005', serial: '30CC-PHX-33288', family: 'Commercial Chillers',              model: 'CH-120X',       installDate: '2017-11-28', account: 'A-305', dealer: 'D-205', territory: 'Phoenix Valley',      contract: 'Partial', warranty: 'Expired', lastService: '2026-02-11', health: 58, risk: 'High' },
+    { id: 'U-4002', serial: '25HP-HOU-11894', family: 'Performance Heat Pumps',           model: 'HP-36-SEER2',   installDate: '2020-09-20', account: 'A-302', dealer: 'D-202', territory: 'Houston Gulf',        contract: 'Lapsed',  warranty: 'Expired', lastService: '2026-01-14', health: 61, risk: 'Medium' },
+    { id: 'U-4007', serial: '40AH-CHI-55108', family: 'Air Handlers',                     model: 'AHU-22C',       installDate: '2020-06-07', account: 'A-307', dealer: 'D-207', territory: 'Chicago Great Lakes', contract: 'Partial', warranty: 'Expired', lastService: '2026-02-05', health: 66, risk: 'Medium' },
+    { id: 'U-4003', serial: '38IF-ATL-44031', family: 'Infinity Residential Split Systems', model: 'INF-24A',    installDate: '2021-05-09', account: 'A-303', dealer: 'D-203', territory: 'Atlanta Metro',       contract: 'Active',  warranty: 'Active',  lastService: '2026-02-17', health: 78, risk: 'Low' },
+  ],
+  heroUnitHistory: [
+    { date: '2024-06-18', source: 'ERP Work Order',         event: 'Compressor short cycling observed',                    insight: 'compressor instability trend begins' },
+    { date: '2024-08-02', source: 'Scanned Technician Note', event: '"fan motor noisy, airflow inconsistent"',              insight: 'condenser fan wear flagged' },
+    { date: '2024-11-14', source: 'Field Estimate PDF',     event: 'recommended coil clean + board check',                 insight: 'evaporator efficiency decline' },
+    { date: '2025-03-05', source: 'ERP Parts Record',       event: 'contactor replaced',                                   insight: 'power/control issue recorded' },
+    { date: '2025-07-22', source: 'Handwritten Service Sheet', event: '"return visit, temp not holding"',                  insight: 'repeat performance failure' },
+    { date: '2025-10-16', source: 'Technician Note',        event: '"possible refrigerant loss, unit underperforming"',    insight: 'leak risk indicator added' },
+    { date: '2026-01-26', source: 'ERP Work Order',         event: 'emergency dispatch, product temp drift',               insight: 'high-value downtime risk event' },
+  ],
+  heroComponents: [
+    { component: 'Compressor Assembly',   age: '6.9 years · degraded',           history: 'no full replacement',        risk: 82, confidence: 88, action: 'inspect + stage replacement path' },
+    { component: 'Condenser Fan Motor',   age: 'repeated noise indicators',      history: 'partial service note only',  risk: 74, confidence: 81, action: 'bring replacement motor' },
+    { component: 'Control Board',         age: 'one prior event',                history: 'replaced 2025-03-05',        risk: 41, confidence: 64, action: 'monitor' },
+    { component: 'Expansion Valve',       age: 'no direct replacement history',  history: 'inferred instability',       risk: 58, confidence: 61, action: 'inspect during visit' },
+    { component: 'Refrigerant Circuit',   age: 'likely leak pattern',            history: 'none logged as full repair', risk: 69, confidence: 72, action: 'leak test kit required' },
+  ],
+  heroPartsKit: [
+    { part: 'P-78114', desc: 'Condenser Fan Motor Assembly',    rationale: 'repeated airflow / noise signals',     availability: 'In Regional Stock',  urgency: 'High' },
+    { part: 'P-99311', desc: 'Refrigerant Leak Test Kit',       rationale: 'likely leak pattern in service history', availability: 'In Regional Stock', urgency: 'High' },
+    { part: 'P-44028', desc: 'Contactor Kit',                    rationale: 'historical electrical control issue',  availability: 'In Van Stock',       urgency: 'Medium' },
+    { part: 'P-55019', desc: 'Expansion Valve Service Kit',      rationale: 'probable instability in cooling cycle', availability: 'Limited Stock',     urgency: 'Medium' },
+    { part: 'P-11043', desc: 'Coil Cleaning Pack',               rationale: 'reduced thermal performance pattern',  availability: 'In Stock',           urgency: 'Low' },
+  ],
+  fleetPatterns: [
+    { id: 'FP-001', component: 'Condenser Fan Motor',   family: 'Packaged Rooftop Units',           modelGroup: 'RTU-48P / RTU-60P',  geography: 'South + West',           units: 184, trend: '+22%', severity: 'High',   owner: 'Service Ops' },
+    { id: 'FP-002', component: 'Control Board Fault',   family: 'Variable Refrigerant Flow Systems', modelGroup: 'VRF-72M',            geography: 'Southeast',              units:  96, trend: '+31%', severity: 'High',   owner: 'Engineering' },
+    { id: 'FP-003', component: 'Refrigerant Leak Pattern', family: 'Commercial Chillers',           modelGroup: 'CH-95Z / CH-120X',   geography: 'Northeast + Southwest',  units:  61, trend: '+18%', severity: 'Medium', owner: 'Quality' },
+    { id: 'FP-004', component: 'Sensor Drift',          family: 'Infinity Residential Split Systems', modelGroup: 'INF-24A',           geography: 'Midwest',                units: 212, trend: '+12%', severity: 'Medium', owner: 'Product Support' },
+    { id: 'FP-005', component: 'Contactor Wear',        family: 'Performance Heat Pumps',           modelGroup: 'HP-36-SEER2',        geography: 'South Central',          units: 145, trend: '+15%', severity: 'Medium', owner: 'Field Service' },
+  ],
+  alerts: [
+    { id: 'AL-7001', type: 'Unit health below threshold',     unit: 'U-4006', account: 'Pacific Cold Storage Network',    territory: 'Southern California', severity: 'Critical', owner: 'Dealer Manager', created: '2026-04-18 07:42', status: 'Open', next: 'confirm dispatch brief' },
+    { id: 'AL-7002', type: 'Repeat component fault detected', unit: 'U-4004', account: 'SunBelt School District Cluster',  territory: 'Orlando-Tampa',       severity: 'Critical', owner: 'Service Ops',    created: '2026-04-18 08:05', status: 'Open', next: 'escalate to engineering' },
+    { id: 'AL-7006', type: 'Recurring fleet failure pattern', unit: 'FP-001', account: 'Packaged Rooftop Units',           territory: 'Multi-Territory',     severity: 'High',     owner: 'Quality Lead',   created: '2026-04-18 09:34', status: 'Open', next: 'review bulletin threshold' },
+    { id: 'AL-7004', type: 'Parts readiness issue',           unit: 'U-4001', account: 'North Texas Medical Plaza',        territory: 'Dallas-Fort Worth',   severity: 'High',     owner: 'Dispatcher',     created: '2026-04-18 08:31', status: 'Open', next: 'stage kit before visit' },
+    { id: 'AL-7003', type: 'Lapsed contract opportunity',     unit: 'A-302',  account: 'Gulf Coast Logistics Hub',         territory: 'Houston Gulf',        severity: 'Medium',   owner: 'Territory Rep',  created: '2026-04-18 08:22', status: 'Open', next: 'assign contract outreach' },
+    { id: 'AL-7005', type: 'Delivery timeline risk',          unit: 'D-206',  account: 'Pacific HVAC Alliance',            territory: 'Southern California', severity: 'Medium',   owner: 'Regional Ops',   created: '2026-04-18 09:10', status: 'Open', next: 'notify customer team' },
+  ],
+  dispatches: [
+    { time: '08:00 AM', account: 'Pacific Cold Storage Network',    unitId: 'U-4006', dealer: 'D-206', tech: 'Miguel Santos', health: 45, risk: 'Critical', visitType: 'Emergency Service',        successProb: 62 },
+    { time: '08:30 AM', account: 'North Texas Medical Plaza',       unitId: 'U-4001', dealer: 'D-201', tech: 'Chris Nolan',   health: 54, risk: 'High',     visitType: 'Preventive + Diagnostic',  successProb: 71 },
+    { time: '09:00 AM', account: 'SunBelt School District Cluster', unitId: 'U-4004', dealer: 'D-204', tech: 'Alicia Perez',  health: 47, risk: 'Critical', visitType: 'Repeat Service Visit',     successProb: 58 },
+    { time: '10:00 AM', account: 'Gulf Coast Logistics Hub',        unitId: 'U-4002', dealer: 'D-202', tech: 'Evan Brooks',   health: 61, risk: 'Medium',   visitType: 'Contract Recovery + Service', successProb: 76 },
+    { time: '11:30 AM', account: 'Northeast Life Sciences Campus',  unitId: 'U-4008', dealer: 'D-208', tech: 'Dana Mitchell', health: 52, risk: 'High',     visitType: 'Chiller Inspection',       successProb: 67 },
+  ],
+  execKpis: {
+    totalRevenueBase: 21.75,
+    totalAftermarketBase: 6.09,
+    addressableOpp: 1.218,
+    year1Target: 12.5,
+    aftermarketLift: 152.25,
+    unplannedReduction: 1.2,
+    fixEfficiency: 1.875,
+    contractRecovery: 5.0,
+    dataRecovery: 15.0,
+    totalAnnualValue: 175.325,
+  },
+  contract: { addressable: 200000, lapsedPct: 20, convPct: 5, newContracts: 10000, avgValue: 500, revenueOpp: 5_000_000 },
+  dataRecovery: { unitsUnknown: 1_000_000, conversionLift: 5, recoveredLeads: 50_000, avgGpPerLead: 300, value: 15_000_000 },
+};
+
+/* ============================================================
+   UTILITIES
+============================================================ */
+const fmtMoney = (m) => {
+  if (m >= 1000) return `$${(m/1000).toFixed(2)}B`;
+  return `$${m.toFixed(m >= 10 ? 1 : 2)}M`;
+};
+const fmtNum = (n) => n.toLocaleString();
+const fmtPct = (n, digits=1) => `${n.toFixed(digits)}%`;
+
+const severityColor = (sev) => ({
+  Critical: 'text-rose-700 bg-rose-50 ring-rose-200',
+  High:     'text-amber-800 bg-amber-50 ring-amber-200',
+  Medium:   'text-sky-700 bg-sky-50 ring-sky-200',
+  Low:      'text-emerald-700 bg-emerald-50 ring-emerald-200',
+}[sev] || 'text-slate-700 bg-slate-50 ring-slate-200');
+
+const riskColor = (r) => ({
+  Critical: 'text-rose-700 bg-rose-50 ring-rose-200',
+  High:     'text-amber-800 bg-amber-50 ring-amber-200',
+  Medium:   'text-sky-700 bg-sky-50 ring-sky-200',
+  Low:      'text-emerald-700 bg-emerald-50 ring-emerald-200',
+}[r] || 'text-slate-700 bg-slate-50 ring-slate-200');
+
+const contractColor = (c) => ({
+  Lapsed:  'text-rose-700 bg-rose-50 ring-rose-200',
+  Partial: 'text-amber-800 bg-amber-50 ring-amber-200',
+  Active:  'text-emerald-700 bg-emerald-50 ring-emerald-200',
+}[c] || 'text-slate-700 bg-slate-50 ring-slate-200');
+
+/* ============================================================
+   ATOMIC COMPONENTS
+============================================================ */
+const Pill = ({ children, className = '' }) => (
+  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded ring-1 ring-inset ${className}`}>{children}</span>
+);
+
+const KpiCard = ({ label, value, delta, deltaLabel, positive = true, sub }) => (
+  <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5 flex flex-col min-w-0">
+    <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">{label}</div>
+    <div className="mt-2 text-3xl font-semibold text-slate-900 tabular leading-none">{value}</div>
+    {delta && (
+      <div className={`mt-3 flex items-center gap-1.5 text-xs ${positive ? 'text-emerald-700' : 'text-rose-700'}`}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{transform: positive ? 'none' : 'rotate(180deg)'}}>
+          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline>
+        </svg>
+        <span className="font-semibold tabular">{delta}</span>
+        <span className="text-slate-500 font-normal">{deltaLabel}</span>
+      </div>
+    )}
+    {sub && <div className="mt-3 text-[11px] text-slate-500">{sub}</div>}
+  </div>
+);
+
+const SectionCard = ({ title, right, children, className='' }) => (
+  <div className={`bg-white ring-1 ring-slate-200 rounded-lg ${className}`}>
+    {(title || right) && (
+      <div className="flex items-center justify-between px-5 py-3.5 hairline">
+        <div className="text-[11px] uppercase tracking-[0.08em] text-slate-600 font-semibold flex items-center gap-2">{title}</div>
+        {right && <div className="text-xs text-slate-500">{right}</div>}
+      </div>
+    )}
+    <div className="p-5">{children}</div>
+  </div>
+);
+
+/* ============================================================
+   LAYOUT · SIDEBAR
+============================================================ */
+const NAV = [
+  { group: 'CORE', items: [
+    { id: 'exec',       label: 'Executive Command',  icon: 'grid' },
+    { id: 'unit',       label: 'Unit Intelligence',  icon: 'cpu' },
+    { id: 'fleet',      label: 'Fleet Insights',     icon: 'activity' },
+    { id: 'dealer',     label: 'Dealer Intelligence',icon: 'map' },
+  ]},
+  { group: 'OPERATIONS', items: [
+    { id: 'dispatch',   label: 'Dispatch Copilot',   icon: 'navigation' },
+    { id: 'alerts',     label: 'Alerts',             icon: 'bell' },
+    { id: 'recovery',   label: 'Data Recovery',      icon: 'database' },
+  ]},
+  { group: 'LEADERSHIP', items: [
+    { id: 'review',     label: 'Executive Review',   icon: 'bar' },
+    { id: 'governance', label: 'Policy Governance',  icon: 'shield' },
+  ]},
+];
+
+const Icon = ({ name, className = 'w-4 h-4' }) => {
+  const s = { strokeWidth: 1.75, stroke: 'currentColor', fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' };
+  const P = (d) => <svg viewBox="0 0 24 24" className={className} {...s} xmlns="http://www.w3.org/2000/svg">{d}</svg>;
+  switch (name) {
+    case 'grid':       return P(<><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>);
+    case 'cpu':        return P(<><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></>);
+    case 'activity':   return P(<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>);
+    case 'map':        return P(<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>);
+    case 'navigation': return P(<polygon points="3 11 22 2 13 21 11 13 3 11"/>);
+    case 'bell':       return P(<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>);
+    case 'database':   return P(<><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></>);
+    case 'bar':        return P(<><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></>);
+    case 'shield':     return P(<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>);
+    case 'search':     return P(<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>);
+    case 'bell-sm':    return P(<><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>);
+    case 'chevron':    return P(<polyline points="9 18 15 12 9 6"/>);
+    case 'external':   return P(<><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></>);
+    case 'check':      return P(<polyline points="20 6 9 17 4 12"/>);
+    case 'file':       return P(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>);
+    case 'image':      return P(<><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></>);
+    case 'zap':        return P(<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>);
+    case 'truck':      return P(<><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>);
+    case 'alert':      return P(<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>);
+    case 'tool':       return P(<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>);
+    default: return null;
+  }
+};
+
+const CarrierLogo = ({ w = 54 }) => (
+  <svg viewBox="0 0 800 330" width={w} height={w * 330/800} xmlns="http://www.w3.org/2000/svg" aria-label="Carrier">
+    <ellipse cx="400" cy="165" rx="395" ry="160" fill="#1a3d7a"/>
+    <ellipse cx="400" cy="165" rx="372" ry="138" fill="none" stroke="#ffffff" strokeWidth="5"/>
+    <text x="400" y="240" fontFamily="'Playfair Display', Georgia, 'Times New Roman', serif" fontStyle="italic" fontWeight="500" fontSize="190" fill="#ffffff" textAnchor="middle" letterSpacing="-2">Carrier</text>
+  </svg>
+);
+
+const Sidebar = ({ page, setPage }) => (
+  <aside className="fixed inset-y-0 left-0 w-[232px] bg-carrier-navy2 text-slate-200 flex flex-col z-20">
+    <div className="px-5 pt-5 pb-6 flex items-start gap-3">
+      <div className="shrink-0"><CarrierLogo w={54} /></div>
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-[0.12em] text-carrier-gold font-semibold">CARRIER</div>
+        <div className="text-[13px] text-white font-medium leading-tight mt-0.5">Install Base<br/>Intelligence</div>
+      </div>
+    </div>
+    <nav className="flex-1 overflow-y-auto scrollbar-thin px-3">
+      {NAV.map(g => (
+        <div key={g.group} className="mb-5">
+          <div className="px-3 pb-2 text-[10px] uppercase tracking-[0.12em] text-slate-500 font-semibold">{g.group}</div>
+          <ul>
+            {g.items.map(it => {
+              const active = page === it.id;
+              return (
+                <li key={it.id}>
+                  <button
+                    onClick={() => setPage(it.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-colors ${active ? 'bg-carrier-navy3 text-white' : 'text-slate-300 hover:bg-carrier-navy3/60 hover:text-white'}`}
+                  >
+                    <Icon name={it.icon} className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{it.label}</span>
+                    {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-carrier-gold" />}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </nav>
+    <div className="px-5 py-3 text-[10px] text-slate-500 border-t border-carrier-navy3">
+      v1.0.0 · Environment: <span className="text-carrier-gold">Demo</span>
+    </div>
+  </aside>
+);
+
+const TopBar = ({ page }) => {
+  const crumb = {
+    exec: 'Executive Command Center',
+    unit: 'Unit Intelligence',
+    fleet: 'Fleet Insights',
+    dealer: 'Dealer Intelligence',
+    dispatch: 'Dispatch Copilot',
+    alerts: 'Alerts',
+    recovery: 'Data Recovery',
+    review: 'Executive Review',
+    governance: 'Policy Governance',
+  }[page] || 'Overview';
+  return (
+    <header className="h-14 bg-white ring-1 ring-slate-200 flex items-center px-6 gap-4 sticky top-0 z-10">
+      <div className="flex items-center gap-2 text-[13px]">
+        <span className="uppercase text-[11px] tracking-[0.08em] text-slate-500 font-semibold">IBI</span>
+        <Icon name="chevron" className="w-3.5 h-3.5 text-slate-400" />
+        <span className="text-slate-900 font-semibold">{crumb}</span>
+      </div>
+      <div className="ml-auto flex items-center gap-5 text-slate-500">
+        <button className="hover:text-slate-900"><Icon name="search" className="w-[18px] h-[18px]" /></button>
+        <button className="relative hover:text-slate-900">
+          <Icon name="bell-sm" className="w-[18px] h-[18px]" />
+          <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500" />
+        </button>
+        <div className="flex items-center gap-2.5 pl-5 border-l border-slate-200">
+          <div className="h-8 w-8 rounded-md bg-carrier-navy2 text-white flex items-center justify-center text-[11px] font-semibold">RN</div>
+          <div className="text-right leading-tight">
+            <div className="text-[12px] text-slate-900 font-semibold">R. Nguyen</div>
+            <div className="text-[11px] text-slate-500">SVP Aftermarket Ops</div>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+/* ============================================================
+   PAGE · EXECUTIVE COMMAND CENTER
+============================================================ */
+const ExecPage = () => {
+  const K = DATA.execKpis;
+
+  const revenueFunnel = [
+    { stage: 'Total Aftermarket Base', value: 6090, color: '#cbd5e1' },
+    { stage: 'Addressable Opportunity', value: 1218, color: '#7c93b8' },
+    { stage: 'Year 1 Target',           value: 175,  color: '#1a3d7a' },
+  ];
+  const territoryBar = DATA.territories.slice(0, 6).map(t => ({ name: t.name, value: t.revenueOpp }));
+  const atRiskByFamily = [
+    { family: 'Packaged Rooftop',    units: 3420 },
+    { family: 'VRF Systems',         units: 1180 },
+    { family: 'Commercial Chillers', units:  820 },
+    { family: 'Infinity Res. Split', units: 2760 },
+    { family: 'Heat Pumps',          units: 1940 },
+    { family: 'Air Handlers',        units:  620 },
+  ];
+  const contractTrend = [
+    { m: 'Nov', lapsed: 14800, recovered:  140 },
+    { m: 'Dec', lapsed: 15100, recovered:  320 },
+    { m: 'Jan', lapsed: 15400, recovered:  610 },
+    { m: 'Feb', lapsed: 15800, recovered:  940 },
+    { m: 'Mar', lapsed: 16100, recovered: 1320 },
+    { m: 'Apr', lapsed: 16400, recovered: 1780 },
+  ];
+
+  return (
+    <div className="px-8 py-6 space-y-6">
+
+      {/* Hero */}
+      <div className="hero-gradient rounded-xl p-6 text-white flex items-start gap-6 relative overflow-hidden">
+        <div className="h-11 w-11 rounded-lg bg-carrier-gold/15 ring-1 ring-carrier-gold/40 flex items-center justify-center shrink-0">
+          <svg viewBox="0 0 24 24" className="w-5 h-5 text-carrier-gold" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </div>
+        <div className="flex-1">
+          <div className="text-[17px] font-semibold">Install Base Intelligence</div>
+          <p className="text-slate-300 text-[13px] leading-relaxed mt-1.5 max-w-3xl">
+            Unified unit history, component health scoring, fleet-wide failure detection, and dealer intelligence — recovered from fragmented ERP systems, paper records, and field estimates.
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Operating Period</div>
+          <div className="text-[15px] font-semibold mt-1">April 2026 — MTD</div>
+          <div className="text-[11px] text-slate-400 mt-1">Last refresh: 3 min ago</div>
+        </div>
+      </div>
+
+      {/* Exec KPI Strip */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="Total Revenue Base"       value="$21.75B" sub="FY25 annualized" />
+        <KpiCard label="Total Aftermarket Base"   value="$6.09B"  sub="28% of total revenue" />
+        <KpiCard label="Addressable Opportunity"  value="$1.218B" sub="locked in legacy + paper" />
+        <KpiCard label="Year 1 Execution Target"  value="12.5%"   sub="conservative half of CEO 25% goal" />
+        <KpiCard label="Year 1 Value Created"     value="$175.3M" delta="+$175.3M" deltaLabel="combined lift" positive />
+      </div>
+
+      {/* Value breakdown cards */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="Aftermarket Revenue Lift"   value="$152.25M" delta="+20%"   deltaLabel="uplift target" positive />
+        <KpiCard label="Unplanned Visit Reduction"  value="$1.2M"    delta="-15%"   deltaLabel="emergency truck rolls" positive />
+        <KpiCard label="First-Time Fix Efficiency"  value="$1.875M"  delta="+15%"   deltaLabel="fix rate" positive />
+        <KpiCard label="Service Contract Recovery"  value="$5.0M"    delta="+10k"   deltaLabel="new contracts" positive />
+        <KpiCard label="Data Recovery Value"        value="$15.0M"   delta="+50k"   deltaLabel="recovered leads" positive />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Opportunity funnel */}
+        <SectionCard title="Opportunity Funnel" right="FY26 Year 1 conservative" className="col-span-5">
+          <div className="space-y-4">
+            {revenueFunnel.map((r,i) => {
+              const pct = (r.value / revenueFunnel[0].value) * 100;
+              return (
+                <div key={r.stage}>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-[12px] text-slate-700">{r.stage}</span>
+                    <span className="text-[13px] font-semibold tabular text-slate-900">${r.value >= 1000 ? (r.value/1000).toFixed(2)+'B' : r.value+'M'}</span>
+                  </div>
+                  <div className="h-8 bg-slate-100 rounded-sm overflow-hidden flex items-center">
+                    <div className="h-full flex items-center justify-end pr-2 text-[11px] font-medium text-white" style={{ width: `${pct}%`, background: r.color }}>
+                      {pct > 18 && <span>{pct.toFixed(1)}%</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 leading-relaxed">
+              Year 1 captures half of Carrier CEO's stated 25% aftermarket goal. Remaining $1.04B remains addressable over the multi-year arc.
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Territory bar */}
+        <SectionCard title="Revenue Opportunity by Territory" right="$M · top 6" className="col-span-4">
+          <div className="h-[260px] -ml-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={territoryBar} layout="vertical" margin={{ top: 4, right: 20, left: 0, bottom: 4 }}>
+                <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} width={130} />
+                <Tooltip formatter={(v) => [`$${v}M`, 'Revenue Opp']} cursor={{ fill: '#f1f5f9' }} />
+                <Bar dataKey="value" fill="#1a3d7a" radius={[0, 3, 3, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </SectionCard>
+
+        {/* At-risk by family */}
+        <SectionCard title="At-Risk Units by Product Family" right="fleet total" className="col-span-3">
+          <div className="space-y-2.5">
+            {atRiskByFamily.map(f => {
+              const max = Math.max(...atRiskByFamily.map(x => x.units));
+              const pct = (f.units / max) * 100;
+              return (
+                <div key={f.family}>
+                  <div className="flex items-baseline justify-between text-[11px]">
+                    <span className="text-slate-600 truncate">{f.family}</span>
+                    <span className="tabular font-semibold text-slate-900">{fmtNum(f.units)}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                    <div className="h-full bg-carrier-blue rounded-full" style={{ width: `${pct}%` }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Territory table + Contract trend */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Territory Opportunity Ranking" right={`8 territories · North America`} className="col-span-8">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                  <th className="pl-5 pr-3 py-2">#</th>
+                  <th className="px-3 py-2">Territory</th>
+                  <th className="px-3 py-2 text-right">Installed</th>
+                  <th className="px-3 py-2 text-right">Unknown</th>
+                  <th className="px-3 py-2 text-right">At-Risk</th>
+                  <th className="px-3 py-2 text-right">Lapsed Contracts</th>
+                  <th className="px-3 py-2 text-right">Revenue Opp</th>
+                  <th className="pl-3 pr-5 py-2">Action</th>
+                </tr>
+              </thead>
+              <tbody className="text-slate-800">
+                {DATA.territories.map(t => (
+                  <tr key={t.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                    <td className="pl-5 pr-3 py-3 text-slate-500 tabular">{t.rank}</td>
+                    <td className="px-3 py-3">
+                      <div className="font-semibold text-slate-900">{t.name}</div>
+                      <div className="text-[11px] text-slate-500">{t.region}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular">{fmtNum(t.installedUnits)}</td>
+                    <td className="px-3 py-3 text-right tabular text-slate-500">{fmtNum(t.unknownUnits)}</td>
+                    <td className="px-3 py-3 text-right tabular"><span className="text-amber-800 font-semibold">{fmtNum(t.atRiskUnits)}</span></td>
+                    <td className="px-3 py-3 text-right tabular">{fmtNum(t.lapsedContracts)}</td>
+                    <td className="px-3 py-3 text-right tabular font-semibold text-slate-900">${t.revenueOpp.toFixed(1)}M</td>
+                    <td className="pl-3 pr-5 py-3">
+                      <span className="text-[11px] text-carrier-blue font-medium">activate →</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Contract Recovery Trend" right="6-month" className="col-span-4">
+          <div className="h-[160px] -mx-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={contractTrend} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="rec" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#1a3d7a" stopOpacity={0.35}/>
+                    <stop offset="100%" stopColor="#1a3d7a" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="m" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={30}/>
+                <Tooltip />
+                <Area type="monotone" dataKey="recovered" stroke="#1a3d7a" strokeWidth={2} fill="url(#rec)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-100">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Addressable</div>
+              <div className="text-lg font-semibold tabular mt-1">200,000</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Y1 Recovery</div>
+              <div className="text-lg font-semibold tabular mt-1 text-carrier-blue">10,000</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Avg Value</div>
+              <div className="text-lg font-semibold tabular mt-1">$500</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Revenue Opp</div>
+              <div className="text-lg font-semibold tabular mt-1 text-emerald-700">$5.0M</div>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Value realization split */}
+      <SectionCard title="Value Realization" right="$175.3M Year 1 conservative · how it breaks down">
+        <div className="grid grid-cols-3 gap-6">
+          <div className="p-4 rounded-md bg-slate-50 ring-1 ring-slate-200">
+            <div className="flex items-center gap-2 text-carrier-blue">
+              <Icon name="truck" className="w-4 h-4"/>
+              <div className="text-[11px] uppercase tracking-[0.08em] font-semibold">Operational</div>
+            </div>
+            <div className="text-2xl font-semibold tabular mt-2">$3.075M</div>
+            <div className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Unplanned visit reduction + first-time fix efficiency. Fewer emergency truck rolls, fewer second-trips.
+            </div>
+          </div>
+          <div className="p-4 rounded-md bg-slate-50 ring-1 ring-slate-200">
+            <div className="flex items-center gap-2 text-carrier-blue">
+              <Icon name="zap" className="w-4 h-4"/>
+              <div className="text-[11px] uppercase tracking-[0.08em] font-semibold">Commercial</div>
+            </div>
+            <div className="text-2xl font-semibold tabular mt-2">$157.25M</div>
+            <div className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Aftermarket revenue lift + service contract recovery. Territory maps + attach prompts inside Salesforce.
+            </div>
+          </div>
+          <div className="p-4 rounded-md bg-slate-50 ring-1 ring-slate-200">
+            <div className="flex items-center gap-2 text-carrier-blue">
+              <Icon name="database" className="w-4 h-4"/>
+              <div className="text-[11px] uppercase tracking-[0.08em] font-semibold">Recovered from Disconnected Data</div>
+            </div>
+            <div className="text-2xl font-semibold tabular mt-2">$15.0M</div>
+            <div className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Leads surfaced by digitizing paper service records, handwritten field estimates, and legacy ERP history.
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · UNIT INTELLIGENCE
+============================================================ */
+const UnitPage = () => {
+  const [selectedId, setSelectedId] = useState('U-4006');
+  const [filter, setFilter] = useState('');
+  const units = DATA.units.filter(u => !filter || u.id.toLowerCase().includes(filter.toLowerCase()) || u.account.toLowerCase().includes(filter.toLowerCase()));
+  const u = DATA.units.find(x => x.id === selectedId) || DATA.units[0];
+  const acct = DATA.accounts.find(a => a.id === u.account);
+
+  const sourceColor = (s) => {
+    if (s.includes('ERP')) return 'bg-sky-100 text-sky-800 ring-sky-200';
+    if (s.includes('Scanned') || s.includes('Field') || s.includes('Handwritten') || s.includes('Note')) return 'bg-amber-100 text-amber-900 ring-amber-200';
+    return 'bg-slate-100 text-slate-700 ring-slate-200';
+  };
+
+  return (
+    <div className="px-6 py-5">
+      <div className="grid grid-cols-12 gap-4">
+
+        {/* LEFT: Unit list */}
+        <div className="col-span-3">
+          <div className="bg-white ring-1 ring-slate-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 hairline">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Active Watchlist</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">8 units · prioritized by risk</div>
+              <div className="mt-2 relative">
+                <Icon name="search" className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"/>
+                <input value={filter} onChange={(e)=>setFilter(e.target.value)} placeholder="Filter units…" className="w-full text-[12px] pl-7 pr-2 py-1.5 ring-1 ring-slate-200 rounded bg-slate-50 focus:bg-white focus:outline-none focus:ring-carrier-blue/40"/>
+              </div>
+            </div>
+            <ul className="divide-y divide-slate-100 max-h-[760px] overflow-y-auto scrollbar-thin">
+              {units.map(unit => {
+                const sel = unit.id === selectedId;
+                return (
+                  <li key={unit.id}>
+                    <button onClick={()=>setSelectedId(unit.id)} className={`w-full text-left px-4 py-3 transition-colors ${sel ? 'bg-carrier-blue/[0.06]' : 'hover:bg-slate-50'}`}>
+                      <div className="flex items-baseline justify-between">
+                        <div className={`text-[12px] font-semibold tabular ${sel ? 'text-carrier-blue' : 'text-slate-900'}`}>{unit.id}</div>
+                        <Pill className={riskColor(unit.risk)}>{unit.risk}</Pill>
+                      </div>
+                      <div className="text-[11px] text-slate-700 mt-1 truncate">{(DATA.accounts.find(a=>a.id===unit.account)||{}).name}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{unit.family}</div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="text-[10px] text-slate-500">Health</div>
+                        <div className={`text-[11px] font-semibold tabular ${unit.health < 50 ? 'text-rose-700' : unit.health < 65 ? 'text-amber-700' : unit.health < 80 ? 'text-sky-700' : 'text-emerald-700'}`}>{unit.health}</div>
+                      </div>
+                      <div className="h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                        <div className={`h-full rounded-full ${unit.health < 50 ? 'bg-rose-500' : unit.health < 65 ? 'bg-amber-500' : unit.health < 80 ? 'bg-sky-500' : 'bg-emerald-500'}`} style={{ width: `${unit.health}%` }}/>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+
+        {/* CENTER: Unit detail */}
+        <div className="col-span-6 space-y-4">
+
+          {/* Header card */}
+          <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5">
+            <div className="flex items-start gap-4">
+              <div className={`h-12 w-12 rounded-md ${u.risk === 'Critical' ? 'bg-rose-50' : u.risk === 'High' ? 'bg-amber-50' : 'bg-sky-50'} flex items-center justify-center`}>
+                <Icon name="cpu" className={`w-6 h-6 ${u.risk === 'Critical' ? 'text-rose-600' : u.risk === 'High' ? 'text-amber-700' : 'text-sky-700'}`}/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[18px] font-semibold text-slate-900">{u.id}</h2>
+                  <Pill className={riskColor(u.risk)}>{u.risk}</Pill>
+                  <Pill className={contractColor(u.contract)}>Contract: {u.contract}</Pill>
+                  <Pill className="bg-slate-100 text-slate-700 ring-slate-200">Warranty: {u.warranty}</Pill>
+                </div>
+                <div className="text-[12px] text-slate-600 mt-1">{u.family} · {u.model}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{(acct || {}).name} · {u.territory}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Health Score</div>
+                <div className={`text-3xl font-semibold tabular leading-none mt-1 ${u.health < 50 ? 'text-rose-700' : u.health < 65 ? 'text-amber-700' : 'text-sky-700'}`}>{u.health}</div>
+                <div className="text-[11px] text-slate-500 mt-1">below 50 → critical</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-x-6 gap-y-3 mt-5 pt-5 border-t border-slate-100 text-[12px]">
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Serial</div><div className="text-slate-900 mt-0.5 tabular">{u.serial}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Install Date</div><div className="text-slate-900 mt-0.5 tabular">{u.installDate}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Dealer</div><div className="text-slate-900 mt-0.5">{u.dealer} · {(DATA.dealers.find(d=>d.id===u.dealer)||{}).name}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Last Service</div><div className="text-slate-900 mt-0.5 tabular">{u.lastService}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Predicted Next Window</div><div className="text-slate-900 mt-0.5">within 14 days</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Failure Risk Level</div><div className="mt-0.5"><Pill className={riskColor(u.risk)}>{u.risk}</Pill></div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Upgrade Eligibility</div><div className="text-slate-900 mt-0.5">Tier 2 · qualified</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Repeat Events (12mo)</div><div className="text-slate-900 mt-0.5 tabular font-semibold">3</div></div>
+            </div>
+          </div>
+
+          {/* Reconstructed history timeline */}
+          <SectionCard title="Reconstructed Service History" right={`${u.id === 'U-4006' ? '7 records · 4 source types · 19-month window' : 'partial history shown'}`}>
+            <div className="text-[11px] text-slate-500 leading-relaxed mb-4">
+              Records merged from ERP work orders, scanned technician notes, field estimate PDFs, and handwritten service sheets. AI-normalized into a single unit history.
+            </div>
+            <div className="relative">
+              <div className="absolute left-[88px] top-2 bottom-2 w-px bg-slate-200"/>
+              <ul className="space-y-4">
+                {(u.id === 'U-4006' ? DATA.heroUnitHistory : DATA.heroUnitHistory.slice(0, 3)).map((h, i) => (
+                  <li key={i} className="relative flex gap-4">
+                    <div className="w-[80px] text-[11px] text-slate-500 tabular pt-0.5 text-right">{h.date}</div>
+                    <div className="relative">
+                      <div className={`mt-1 h-2 w-2 rounded-full ring-2 ring-white ${i === DATA.heroUnitHistory.length - 1 ? 'bg-rose-500' : 'bg-carrier-blue'}`}/>
+                    </div>
+                    <div className="flex-1 pb-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Pill className={sourceColor(h.source)}>{h.source}</Pill>
+                        <span className="text-[12px] text-slate-900 font-medium">{h.event}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1 italic">→ {h.insight}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-3 gap-4 text-[11px]">
+              <div className="bg-slate-50 rounded-md p-3">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Pattern Identified</div>
+                <div className="text-slate-900 mt-1 leading-snug">repeat cooling performance issue across 19 months</div>
+              </div>
+              <div className="bg-slate-50 rounded-md p-3">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Component Chain</div>
+                <div className="text-slate-900 mt-1 leading-snug">fan + refrigerant + control instability</div>
+              </div>
+              <div className="bg-slate-50 rounded-md p-3">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Status</div>
+                <div className="text-slate-900 mt-1 leading-snug">qualifies for proactive parts kit + upgrade review</div>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Component risk */}
+          <SectionCard title="Component Risk Panel" right="ranked by predicted failure risk">
+            <div className="overflow-x-auto -mx-5">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                    <th className="pl-5 pr-3 py-2">Component</th>
+                    <th className="px-3 py-2">Age / Condition</th>
+                    <th className="px-3 py-2">Replacement History</th>
+                    <th className="px-3 py-2 text-right">Risk</th>
+                    <th className="px-3 py-2 text-right">Confidence</th>
+                    <th className="pl-3 pr-5 py-2">Recommended Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {DATA.heroComponents.map((c, i) => (
+                    <tr key={i} className="border-t border-slate-100">
+                      <td className="pl-5 pr-3 py-3 font-semibold text-slate-900">{c.component}</td>
+                      <td className="px-3 py-3 text-slate-700">{c.age}</td>
+                      <td className="px-3 py-3 text-slate-600">{c.history}</td>
+                      <td className="px-3 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${c.risk >= 70 ? 'bg-rose-500' : c.risk >= 50 ? 'bg-amber-500' : 'bg-sky-500'}`} style={{ width: `${c.risk}%` }}/>
+                          </div>
+                          <span className={`tabular font-semibold ${c.risk >= 70 ? 'text-rose-700' : c.risk >= 50 ? 'text-amber-800' : 'text-sky-800'}`}>{c.risk}%</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular text-slate-600">{c.confidence}%</td>
+                      <td className="pl-3 pr-5 py-3 text-slate-700">{c.action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* RIGHT: AI panels */}
+        <div className="col-span-3 space-y-4">
+
+          {/* AI summary */}
+          <div className="bg-carrier-navy2 text-white rounded-lg p-4">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-carrier-gold font-semibold">
+              <Icon name="zap" className="w-3.5 h-3.5"/>
+              AI Unit Brief
+            </div>
+            <div className="text-[12px] text-slate-200 mt-2.5 leading-relaxed">
+              Critical health score driven by repeat cooling instability, likely condenser fan wear, and a probable refrigerant-side issue. Pre-stage fan motor assembly, leak test kit, and valve service kit before dispatch. Estimated second-trip risk drops materially with parts staged in advance.
+            </div>
+            <div className="mt-3 pt-3 border-t border-carrier-navy3 grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <div className="text-slate-400 text-[10px]">Confidence</div>
+                <div className="text-white font-semibold tabular">87%</div>
+              </div>
+              <div>
+                <div className="text-slate-400 text-[10px]">Sources Used</div>
+                <div className="text-white font-semibold tabular">7 records</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Recommended Parts Kit */}
+          <SectionCard title="Recommended Parts Kit" right="pre-dispatch">
+            <ul className="-mx-5 -my-5 divide-y divide-slate-100">
+              {DATA.heroPartsKit.map((p, i) => (
+                <li key={i} className="px-5 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-[12px] font-semibold text-slate-900 tabular">{p.part}</div>
+                    <Pill className={p.urgency === 'High' ? 'bg-rose-50 text-rose-700 ring-rose-200' : p.urgency === 'Medium' ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200'}>{p.urgency}</Pill>
+                  </div>
+                  <div className="text-[12px] text-slate-700 mt-0.5">{p.desc}</div>
+                  <div className="text-[11px] text-slate-500 mt-1 italic">{p.rationale}</div>
+                  <div className="text-[10px] text-slate-500 mt-1.5 flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${p.availability.includes('Limited') ? 'bg-amber-500' : 'bg-emerald-500'}`}/>
+                    {p.availability}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {/* Next Best Actions */}
+          <SectionCard title="Next Best Actions">
+            <ul className="space-y-2">
+              {[
+                { label: 'Dispatch proactive service', primary: true, sub: 'route to Pacific HVAC Alliance' },
+                { label: 'Attach service contract', primary: false, sub: 'lapsed — high recovery confidence' },
+                { label: 'Flag for upgrade review', primary: false, sub: 'eligible Tier 2' },
+                { label: 'Escalate repeat-fault pattern', primary: false, sub: 'fits FP-001 cluster' },
+              ].map((a, i) => (
+                <li key={i}>
+                  <button className={`w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md ring-1 transition-colors ${a.primary ? 'bg-carrier-blue text-white ring-carrier-blue hover:bg-carrier-blue/90' : 'bg-white text-slate-800 ring-slate-200 hover:bg-slate-50'}`}>
+                    <Icon name="check" className={`w-4 h-4 mt-0.5 shrink-0 ${a.primary ? 'text-white' : 'text-carrier-blue'}`}/>
+                    <div className="flex-1">
+                      <div className="text-[12px] font-semibold">{a.label}</div>
+                      <div className={`text-[11px] mt-0.5 ${a.primary ? 'text-blue-100' : 'text-slate-500'}`}>{a.sub}</div>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {/* Linked fleet pattern */}
+          <SectionCard title="Linked Fleet Pattern">
+            <div className="flex items-baseline justify-between">
+              <div className="text-[12px] font-semibold text-slate-900">FP-001</div>
+              <Pill className="bg-amber-50 text-amber-800 ring-amber-200">High</Pill>
+            </div>
+            <div className="text-[12px] text-slate-700 mt-1">Condenser Fan Motor failures across Packaged Rooftop Units (RTU-48P / RTU-60P)</div>
+            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-[11px]">
+              <div>
+                <div className="text-[10px] text-slate-500">Units</div>
+                <div className="font-semibold tabular">184</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-500">90-day trend</div>
+                <div className="font-semibold tabular text-rose-700">+22%</div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-500">Region</div>
+                <div className="font-semibold">South + West</div>
+              </div>
+            </div>
+            <a className="mt-3 inline-flex items-center gap-1 text-[11px] text-carrier-blue font-semibold hover:underline cursor-pointer">
+              View pattern detail <Icon name="chevron" className="w-3 h-3"/>
+            </a>
+          </SectionCard>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · DATA RECOVERY
+============================================================ */
+const DataRecoveryPage = () => {
+  const stages = [
+    { key: 'ingest',    label: 'Ingest',                   detail: 'ERP exports + scanned records + field notes',          svc: 'AWS Glue · Textract', ct: '18.4M' },
+    { key: 'ocr',       label: 'OCR / Extraction',         detail: 'handwritten + typed form extraction',                 svc: 'Amazon Textract',     ct: '12.1M' },
+    { key: 'ner',       label: 'Entity Recognition',       detail: 'part codes, fault codes, component mentions',         svc: 'Amazon Comprehend',   ct: '9.7M' },
+    { key: 'norm',      label: 'Normalization',            detail: 'map to canonical parts taxonomy + resolve ambiguity', svc: 'Amazon Bedrock',      ct: '9.1M' },
+    { key: 'store',     label: 'Governed Storage',         detail: 'unified unit history in the data lake',                svc: 'S3 + Lake Formation', ct: '9.1M' },
+    { key: 'activate',  label: 'Intelligence Activation',  detail: 'health scoring, patterns, parts kits',                 svc: 'Lookout + app layer', ct: 'live' },
+  ];
+
+  const sources = [
+    { type: 'ERP Work Orders',             volume: '2.4M',  pct: 32, tone: 'sky'   },
+    { type: 'Parts Transaction Records',   volume: '1.8M',  pct: 24, tone: 'sky'   },
+    { type: 'Scanned Service Records',     volume: '1.5M',  pct: 20, tone: 'amber' },
+    { type: 'Field Estimate PDFs',         volume: '820K',  pct: 11, tone: 'amber' },
+    { type: 'Handwritten Service Sheets',  volume: '610K',  pct:  8, tone: 'amber' },
+    { type: 'Technician Notes',            volume: '380K',  pct:  5, tone: 'amber' },
+  ];
+
+  const recoveryByFamily = [
+    { family: 'Packaged Rooftop Units',     recovered: 312000, opportunity: 4.1 },
+    { family: 'Performance Heat Pumps',     recovered: 248000, opportunity: 3.3 },
+    { family: 'Infinity Residential Split', recovered: 196000, opportunity: 2.6 },
+    { family: 'Commercial Chillers',        recovered:  88000, opportunity: 2.1 },
+    { family: 'VRF Systems',                recovered:  82000, opportunity: 1.8 },
+    { family: 'Air Handlers',               recovered:  74000, opportunity: 1.1 },
+  ];
+
+  const toneMap = {
+    sky:   { pill: 'bg-sky-50 text-sky-800 ring-sky-200',   bar: 'bg-sky-500' },
+    amber: { pill: 'bg-amber-50 text-amber-900 ring-amber-200', bar: 'bg-amber-500' },
+  };
+
+  return (
+    <div className="px-6 py-5 space-y-5">
+
+      {/* Hero */}
+      <div className="hero-gradient rounded-xl p-5 text-white flex items-start gap-5">
+        <div className="h-11 w-11 rounded-lg bg-carrier-gold/15 ring-1 ring-carrier-gold/40 flex items-center justify-center shrink-0">
+          <Icon name="database" className="w-5 h-5 text-carrier-gold"/>
+        </div>
+        <div className="flex-1">
+          <div className="text-[17px] font-semibold">Data Recovery Pipeline</div>
+          <div className="text-slate-300 text-[13px] leading-relaxed mt-1 max-w-3xl">
+            Paper service records, handwritten field estimates, and disconnected ERP exports become a governed, queryable unit history. Every unit gets a recoverable past — the step that makes every downstream intelligence capability possible.
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Recovered to date</div>
+          <div className="text-[18px] font-semibold mt-1">$15.0M<span className="text-slate-400 text-[12px] ml-2">Year 1 value</span></div>
+          <div className="text-[11px] text-slate-400 mt-0.5">50,000 leads surfaced · 1M units touched</div>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="Units Unknown"         value="1.00M" sub="legacy / paper / disconnected ERP" />
+        <KpiCard label="Sales Conversion Lift" value="5.0%"  sub="leads surfaced per recovered unit" />
+        <KpiCard label="Recovered Leads"       value="50,000" delta="+50,000" deltaLabel="Y1 target" positive />
+        <KpiCard label="Avg Gross Profit / Lead" value="$300" sub="service or part, conservative" />
+        <KpiCard label="Data Recovery Value"   value="$15.0M" delta="+$15.0M" deltaLabel="direct to P&L" positive />
+      </div>
+
+      {/* Pipeline visualization */}
+      <SectionCard title="Ingestion Pipeline" right="stages · volume transiting">
+        <div className="grid grid-cols-6 gap-0 relative">
+          {stages.map((s, i) => (
+            <div key={s.key} className="relative">
+              <div className="bg-slate-50 ring-1 ring-slate-200 rounded-md p-3.5 relative">
+                <div className="flex items-baseline justify-between">
+                  <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Stage {i + 1}</div>
+                  <div className="text-[11px] tabular text-slate-900 font-semibold">{s.ct}</div>
+                </div>
+                <div className="text-[13px] font-semibold text-slate-900 mt-1">{s.label}</div>
+                <div className="text-[11px] text-slate-600 leading-snug mt-1 min-h-[32px]">{s.detail}</div>
+                <div className="text-[10px] text-carrier-blue font-semibold mt-2">{s.svc}</div>
+              </div>
+              {i < stages.length - 1 && (
+                <div className="absolute top-1/2 -right-1 -translate-y-1/2 text-slate-300 z-10 pointer-events-none">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-4 text-[11px] text-slate-500">
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-sky-500"/>Structured source</div>
+          <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500"/>Unstructured source — OCR + normalization required</div>
+          <div className="ml-auto">18.4M raw records → 9.1M normalized unit-history rows · 49.5% yield</div>
+        </div>
+      </SectionCard>
+
+      {/* Sources + Example transformation */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Source Mix" right="records ingested · trailing 12mo" className="col-span-5">
+          <div className="space-y-3">
+            {sources.map(s => (
+              <div key={s.type}>
+                <div className="flex items-baseline justify-between">
+                  <div className="flex items-center gap-2">
+                    <Pill className={toneMap[s.tone].pill}>{s.tone === 'sky' ? 'structured' : 'unstructured'}</Pill>
+                    <span className="text-[12px] text-slate-800">{s.type}</span>
+                  </div>
+                  <span className="text-[12px] font-semibold tabular text-slate-900">{s.volume}</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full mt-1.5 overflow-hidden">
+                  <div className={`h-full rounded-full ${toneMap[s.tone].bar}`} style={{ width: `${s.pct * 3}%` }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 pt-4 border-t border-slate-100 text-[11px] text-slate-500 leading-relaxed">
+            <span className="font-semibold text-slate-700">43% of records arrive unstructured.</span> Without OCR + normalization, nearly half of Carrier's historical service truth stays invisible to analytics.
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Example Transformation" right="before → after" className="col-span-7">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2 flex items-center gap-2"><Icon name="file" className="w-3.5 h-3.5"/> Scanned Technician Note</div>
+              <div className="bg-[#faf7f0] ring-1 ring-amber-200 rounded-md p-4 text-[12px] text-slate-700 leading-relaxed font-serif italic min-h-[180px] relative">
+                <div className="absolute top-2 right-2 text-[9px] uppercase tracking-wider text-amber-700 font-sans non-italic">CLM-NOTE · 2025-10-16</div>
+                "RTU @ dock 4 not holding temp. Fan loud — return call likely if not resolved. Customer says same issue as late summer; unit trips under higher daytime load. Board reset got unit running. Recommend bringing fan motor and checking refrigerant side before next visit."
+              </div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2 flex items-center gap-2"><Icon name="zap" className="w-3.5 h-3.5"/> Structured Extraction Output</div>
+              <div className="bg-carrier-navy2 text-slate-100 rounded-md p-4 text-[11px] font-mono leading-relaxed min-h-[180px]">
+                <div><span className="text-slate-400">unit_id:</span> <span className="text-emerald-300">U-4006</span></div>
+                <div><span className="text-slate-400">fault_symptom:</span> <span className="text-sky-300">"cooling performance degradation"</span></div>
+                <div><span className="text-slate-400">components:</span> <span className="text-amber-300">[fan_motor, refrigerant_circuit, control_board]</span></div>
+                <div><span className="text-slate-400">repeat_issue:</span> <span className="text-emerald-300">true</span></div>
+                <div><span className="text-slate-400">recommended_parts:</span> <span className="text-amber-300">[P-78114, P-99311]</span></div>
+                <div><span className="text-slate-400">confidence:</span> <span className="text-emerald-300">0.87</span></div>
+                <div><span className="text-slate-400">linked_account:</span> <span className="text-sky-300">A-306</span></div>
+                <div><span className="text-slate-400">linked_dealer:</span> <span className="text-sky-300">D-206</span></div>
+                <div><span className="text-slate-400">linked_pattern:</span> <span className="text-rose-300">FP-001</span></div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 text-[11px] text-slate-600 leading-relaxed">
+            This single note — previously filed in a cabinet — now participates in health scoring, recurring-failure detection, and tomorrow's dispatch brief. Multiplied across 610K handwritten service sheets, it is how we arrive at a $15M recovered-value line.
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Recovery by family */}
+      <SectionCard title="Recovered Units & Opportunity by Product Family" right="Year 1 conservative">
+        <div className="overflow-x-auto -mx-5">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                <th className="pl-5 pr-3 py-2">Product Family</th>
+                <th className="px-3 py-2 text-right">Units with Recovered History</th>
+                <th className="px-3 py-2">% of 1M target</th>
+                <th className="px-3 py-2 text-right">Recovered Leads</th>
+                <th className="px-3 py-2 text-right">Opportunity ($M)</th>
+                <th className="pl-3 pr-5 py-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recoveryByFamily.map((r, i) => {
+                const pct = (r.recovered / 1000000) * 100;
+                return (
+                  <tr key={i} className="border-t border-slate-100 hover:bg-slate-50/60">
+                    <td className="pl-5 pr-3 py-3 font-semibold text-slate-900">{r.family}</td>
+                    <td className="px-3 py-3 text-right tabular">{fmtNum(r.recovered)}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-carrier-blue rounded-full" style={{ width: `${pct * 3}%` }}/>
+                        </div>
+                        <span className="text-[11px] tabular text-slate-600">{pct.toFixed(1)}%</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right tabular">{fmtNum(Math.round(r.recovered * 0.05))}</td>
+                    <td className="px-3 py-3 text-right tabular font-semibold text-emerald-700">${r.opportunity.toFixed(1)}M</td>
+                    <td className="pl-3 pr-5 py-3">
+                      <Pill className="bg-emerald-50 text-emerald-700 ring-emerald-200">active</Pill>
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="border-t-2 border-slate-300 bg-slate-50">
+                <td className="pl-5 pr-3 py-3 font-semibold text-slate-900">Total</td>
+                <td className="px-3 py-3 text-right tabular font-semibold">{fmtNum(recoveryByFamily.reduce((a,b)=>a+b.recovered,0))}</td>
+                <td className="px-3 py-3 text-[11px] text-slate-500">toward 1M target</td>
+                <td className="px-3 py-3 text-right tabular font-semibold">{fmtNum(Math.round(recoveryByFamily.reduce((a,b)=>a+b.recovered,0) * 0.05))}</td>
+                <td className="px-3 py-3 text-right tabular font-semibold text-emerald-700">${recoveryByFamily.reduce((a,b)=>a+b.opportunity,0).toFixed(1)}M</td>
+                <td className="pl-3 pr-5 py-3"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · FLEET INSIGHTS
+============================================================ */
+const FleetPage = () => {
+  const [selectedPattern, setSelectedPattern] = useState('FP-001');
+  const fp = DATA.fleetPatterns.find(p => p.id === selectedPattern) || DATA.fleetPatterns[0];
+
+  const familyFailureRate = [
+    { family: 'Packaged Rooftop',    rate: 4.2 },
+    { family: 'VRF Systems',         rate: 3.6 },
+    { family: 'Commercial Chillers', rate: 2.8 },
+    { family: 'Heat Pumps',          rate: 2.1 },
+    { family: 'Air Handlers',        rate: 1.4 },
+    { family: 'Infinity Res. Split', rate: 1.1 },
+  ];
+
+  const warrantyTrend = [
+    { m: 'Nov', exposure: 4.1, claims: 2.2 },
+    { m: 'Dec', exposure: 4.3, claims: 2.4 },
+    { m: 'Jan', exposure: 4.6, claims: 2.7 },
+    { m: 'Feb', exposure: 4.9, claims: 3.0 },
+    { m: 'Mar', exposure: 5.3, claims: 3.4 },
+    { m: 'Apr', exposure: 5.8, claims: 3.9 },
+  ];
+
+  const faultCodes = [
+    { code: 'E04', label: 'No Start',                  count: 1840, trend: '+18%' },
+    { code: 'E11', label: 'Compressor Lockout',        count: 1420, trend: '+24%' },
+    { code: 'E27', label: 'Refrigerant Pressure Low',  count: 1180, trend: '+31%' },
+    { code: 'E08', label: 'Fan Speed Out of Range',    count:  960, trend: '+22%' },
+    { code: 'E15', label: 'Control Board Fault',       count:  720, trend: '+12%' },
+  ];
+
+  // Tiny synthetic US heat — region tiles
+  const regions = [
+    { id: 'NW',  label: 'Pacific NW',     intensity: 0.25, count:  18 },
+    { id: 'W',   label: 'West',           intensity: 0.78, count:  92 },
+    { id: 'SW',  label: 'Southwest',      intensity: 0.55, count:  41 },
+    { id: 'NC',  label: 'North Central',  intensity: 0.30, count:  22 },
+    { id: 'SC',  label: 'South Central',  intensity: 0.62, count:  56 },
+    { id: 'GL',  label: 'Great Lakes',    intensity: 0.42, count:  31 },
+    { id: 'SE',  label: 'Southeast',      intensity: 0.85, count: 110 },
+    { id: 'MA',  label: 'Mid-Atlantic',   intensity: 0.50, count:  38 },
+    { id: 'NE',  label: 'Northeast',      intensity: 0.68, count:  72 },
+  ];
+  const heatColor = (i) => {
+    if (i > 0.75) return 'bg-rose-500/85 text-white';
+    if (i > 0.55) return 'bg-amber-500/80 text-white';
+    if (i > 0.40) return 'bg-amber-300/70 text-slate-800';
+    if (i > 0.25) return 'bg-sky-300/60 text-slate-800';
+    return 'bg-slate-200 text-slate-600';
+  };
+
+  const escalationQueue = [
+    { item: 'FP-001 Condenser Fan Motor — RTU cohort', owner: 'Engineering Review',  status: 'Active',  due: 'Apr 24', count: 184 },
+    { item: 'FP-002 Control Board Fault — VRF-72M',    owner: 'Engineering Review',  status: 'Active',  due: 'Apr 26', count:  96 },
+    { item: 'FP-003 Refrigerant Leak — Chiller models',owner: 'Quality',             status: 'Pending', due: 'May 02', count:  61 },
+    { item: 'FP-005 Contactor Wear — HP-36-SEER2',     owner: 'Field Bulletin Eval', status: 'Pending', due: 'May 06', count: 145 },
+  ];
+
+  return (
+    <div className="px-6 py-5 space-y-5">
+
+      {/* Hero */}
+      <div className="hero-gradient rounded-xl p-5 text-white flex items-start gap-5">
+        <div className="h-11 w-11 rounded-lg bg-carrier-gold/15 ring-1 ring-carrier-gold/40 flex items-center justify-center shrink-0">
+          <Icon name="activity" className="w-5 h-5 text-carrier-gold"/>
+        </div>
+        <div className="flex-1">
+          <div className="text-[17px] font-semibold">Fleet Insights</div>
+          <div className="text-slate-300 text-[13px] leading-relaxed mt-1 max-w-3xl">
+            Recurring component failures detected across the installed base. Shifts the question from <span className="text-white font-medium">"which unit is at risk?"</span> to <span className="text-white font-medium">"which fleet pattern is becoming a systemic problem?"</span>
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Top Signal · 90 days</div>
+          <div className="text-[15px] font-semibold mt-1">FP-001 +22%</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">Condenser fan motor · 184 RTUs · S+W</div>
+        </div>
+      </div>
+
+      {/* Health overview */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="Monitored Units"        value="1.61M" sub="active fleet under intelligence" />
+        <KpiCard label="Full History"           value="61%"   sub="980K units · queryable past" />
+        <KpiCard label="Partial History"        value="22%"   sub="357K units · gaps being filled" />
+        <KpiCard label="Below Health Threshold" value="42,180" delta="+8.4%" deltaLabel="30-day" positive={false} />
+        <KpiCard label="Active Escalations"     value="6"     sub="systemic patterns under review" />
+      </div>
+
+      {/* Pattern table + selected pattern detail */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Recurring Failure Patterns" right="5 active · ranked by trend severity" className="col-span-7">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                  <th className="pl-5 pr-3 py-2">Pattern</th>
+                  <th className="px-3 py-2">Component</th>
+                  <th className="px-3 py-2">Family · Model</th>
+                  <th className="px-3 py-2 text-right">Units</th>
+                  <th className="px-3 py-2 text-right">Trend</th>
+                  <th className="px-3 py-2">Severity</th>
+                  <th className="pl-3 pr-5 py-2">Owner</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DATA.fleetPatterns.map(p => {
+                  const sel = p.id === selectedPattern;
+                  return (
+                    <tr key={p.id} onClick={()=>setSelectedPattern(p.id)} className={`border-t border-slate-100 cursor-pointer ${sel ? 'bg-carrier-blue/[0.05]' : 'hover:bg-slate-50/60'}`}>
+                      <td className="pl-5 pr-3 py-3">
+                        <div className={`tabular font-semibold ${sel ? 'text-carrier-blue' : 'text-slate-900'}`}>{p.id}</div>
+                      </td>
+                      <td className="px-3 py-3 text-slate-900">{p.component}</td>
+                      <td className="px-3 py-3 text-slate-600">
+                        <div>{p.family}</div>
+                        <div className="text-[11px] text-slate-500">{p.modelGroup}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular font-semibold">{p.units}</td>
+                      <td className="px-3 py-3 text-right tabular font-semibold text-rose-700">{p.trend}</td>
+                      <td className="px-3 py-3"><Pill className={severityColor(p.severity)}>{p.severity}</Pill></td>
+                      <td className="pl-3 pr-5 py-3 text-slate-700">{p.owner}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <SectionCard title={`Pattern Detail · ${fp.id}`} right={fp.severity} className="col-span-5">
+          <div className="text-[13px] font-semibold text-slate-900">{fp.component}</div>
+          <div className="text-[12px] text-slate-600 mt-0.5">{fp.family} · {fp.modelGroup}</div>
+          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-100">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Units Impacted</div>
+              <div className="text-2xl font-semibold tabular text-slate-900 mt-1">{fp.units}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">90-day Trend</div>
+              <div className="text-2xl font-semibold tabular text-rose-700 mt-1">{fp.trend}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Geography</div>
+              <div className="text-[13px] font-semibold text-slate-900 mt-1.5">{fp.geography}</div>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2">Why this matters</div>
+            <div className="text-[12px] text-slate-700 leading-relaxed">
+              {fp.id === 'FP-001'
+                ? 'Single-component failures across 184 units of the same model family within 90 days exceeds the 50-unit / 90-day systemic threshold. This signature is consistent with a manufacturing or supplier issue rather than maintenance variance — and it is appearing 6+ months before warranty claims would normally surface it.'
+                : 'Cluster exceeds the systemic threshold and warrants engineering or quality review before warranty exposure compounds.'
+              }
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2">
+            <button className="px-3 py-1.5 bg-carrier-blue text-white text-[12px] font-semibold rounded">Open escalation</button>
+            <button className="px-3 py-1.5 bg-white text-slate-700 ring-1 ring-slate-200 text-[12px] font-semibold rounded">Notify dealers</button>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Family rate + warranty trend + fault codes */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Failure Rate by Product Family" right="failures per 1,000 units · 90d" className="col-span-4">
+          <div className="space-y-2.5">
+            {familyFailureRate.map(f => {
+              const max = Math.max(...familyFailureRate.map(x => x.rate));
+              const pct = (f.rate / max) * 100;
+              return (
+                <div key={f.family}>
+                  <div className="flex items-baseline justify-between text-[12px]">
+                    <span className="text-slate-700">{f.family}</span>
+                    <span className="tabular font-semibold text-slate-900">{f.rate}</span>
+                  </div>
+                  <div className="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                    <div className={`h-full rounded-full ${f.rate > 3 ? 'bg-rose-500' : f.rate > 2 ? 'bg-amber-500' : 'bg-sky-500'}`} style={{ width: `${pct}%` }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Warranty Exposure Trend" right="$M · 6mo" className="col-span-4">
+          <div className="h-[170px] -mx-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={warrantyTrend} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="exp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#dc2626" stopOpacity={0.32}/>
+                    <stop offset="100%" stopColor="#dc2626" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="cl" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#1a3d7a" stopOpacity={0.32}/>
+                    <stop offset="100%" stopColor="#1a3d7a" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="m" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false}/>
+                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={28}/>
+                <Tooltip />
+                <Area type="monotone" dataKey="exposure" stroke="#dc2626" strokeWidth={2} fill="url(#exp)" />
+                <Area type="monotone" dataKey="claims"   stroke="#1a3d7a" strokeWidth={2} fill="url(#cl)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-100">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500"/>Exposure</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-carrier-blue"/>Realized claims</span>
+            <span className="ml-auto tabular text-slate-700">+41% exposure since Nov</span>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Top Recurring Fault Codes" right="incidents · 90d" className="col-span-4">
+          <ul className="-mx-5 -my-5 divide-y divide-slate-100">
+            {faultCodes.map(f => (
+              <li key={f.code} className="px-5 py-3 flex items-center gap-3">
+                <div className="px-2 py-1 bg-slate-100 rounded text-[11px] font-mono font-semibold text-slate-700">{f.code}</div>
+                <div className="flex-1">
+                  <div className="text-[12px] text-slate-900 font-medium">{f.label}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[12px] font-semibold tabular text-slate-900">{fmtNum(f.count)}</div>
+                  <div className="text-[11px] tabular text-rose-700">{f.trend}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+
+      {/* Geographic heat + escalation queue */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Geographic Failure Concentration" right="FP-001 cohort · last 90 days" className="col-span-7">
+          <div className="grid grid-cols-3 gap-2 max-w-md mx-auto">
+            {regions.map(r => (
+              <div key={r.id} className={`rounded-md p-3 ${heatColor(r.intensity)} flex flex-col`}>
+                <div className="text-[10px] uppercase tracking-[0.06em] font-semibold opacity-80">{r.id}</div>
+                <div className="text-[12px] font-semibold leading-tight mt-1">{r.label}</div>
+                <div className="text-[16px] font-semibold tabular leading-none mt-2">{r.count}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3 text-[11px] text-slate-500">
+            <span>Failure intensity:</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-slate-200"/>low</span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-sky-300/60"/></span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-amber-300/70"/></span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-amber-500/80"/></span>
+            <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-rose-500/85"/>high</span>
+            <span className="ml-auto text-slate-700">Southeast + West concentration consistent with humidity / thermal load profile</span>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Escalation Queue" right="systemic review" className="col-span-5">
+          <ul className="-mx-5 -my-5 divide-y divide-slate-100">
+            {escalationQueue.map((e, i) => (
+              <li key={i} className="px-5 py-3.5">
+                <div className="flex items-baseline justify-between">
+                  <div className="text-[12px] font-semibold text-slate-900">{e.item}</div>
+                  <Pill className={e.status === 'Active' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-amber-50 text-amber-800 ring-amber-200'}>{e.status}</Pill>
+                </div>
+                <div className="flex items-center justify-between mt-1.5 text-[11px] text-slate-500">
+                  <span>{e.owner} · {e.count} units</span>
+                  <span className="tabular">due {e.due}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · DEALER INTELLIGENCE
+============================================================ */
+const DealerPage = () => {
+  const sortedDealers = [...DATA.dealers].sort((a, b) => a.rank - b.rank);
+  const territoryRanked = [...DATA.territories].sort((a, b) => a.rank - b.rank);
+  const accountRanked = [...DATA.accounts].sort((a, b) => b.revenueK - a.revenueK);
+
+  const deliveryByDealer = sortedDealers.map(d => ({
+    name: d.name.split(' ')[0],
+    time: d.avgCompletion,
+    pr: d.partsReadiness,
+  }));
+
+  const territoryIntensity = (rank) => {
+    const i = (9 - rank) / 8;
+    if (i > 0.75) return { bg: 'bg-rose-500/85',  text: 'text-white' };
+    if (i > 0.55) return { bg: 'bg-amber-500/80', text: 'text-white' };
+    if (i > 0.35) return { bg: 'bg-amber-300/70', text: 'text-slate-800' };
+    return { bg: 'bg-sky-300/50', text: 'text-slate-800' };
+  };
+
+  return (
+    <div className="px-6 py-5 space-y-5">
+
+      {/* Hero */}
+      <div className="hero-gradient rounded-xl p-5 text-white flex items-start gap-5">
+        <div className="h-11 w-11 rounded-lg bg-carrier-gold/15 ring-1 ring-carrier-gold/40 flex items-center justify-center shrink-0">
+          <Icon name="map" className="w-5 h-5 text-carrier-gold"/>
+        </div>
+        <div className="flex-1">
+          <div className="text-[17px] font-semibold">Dealer Intelligence</div>
+          <div className="text-slate-300 text-[13px] leading-relaxed mt-1 max-w-3xl">
+            Territory opportunity maps, dealer performance benchmarks, and ranked account lists — surfaced inside Salesforce Field Service workflows, not a separate portal.
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Aftermarket Opportunity</div>
+          <div className="text-[18px] font-semibold mt-1">$138.6M</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">8 territories · 8 dealer groups</div>
+        </div>
+      </div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-5 gap-4">
+        <KpiCard label="Territory Opportunity"    value="$138.6M" sub="across 8 territories" />
+        <KpiCard label="Lapsed Contract Recovery" value="$5.0M"   delta="+10k"   deltaLabel="new contracts" positive />
+        <KpiCard label="Avg First-Time Fix"       value="70.4%"   delta="+2.1pt" deltaLabel="vs. prior quarter" positive />
+        <KpiCard label="Avg Completion Time"      value="3.0d"    delta="-0.4d"  deltaLabel="vs. baseline" positive />
+        <KpiCard label="Salesforce Integrations"  value="live"    sub="territory + account + parts feeds" />
+      </div>
+
+      {/* Territory map + contract recovery */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Territory Opportunity Map" right="colored by revenue rank · ranked 1 (highest) — 8" className="col-span-8">
+          <div className="grid grid-cols-4 gap-3">
+            {territoryRanked.map(t => {
+              const col = territoryIntensity(t.rank);
+              return (
+                <div key={t.id} className={`rounded-md p-4 ${col.bg} ${col.text}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.06em] opacity-80 font-semibold">Rank {t.rank}</div>
+                      <div className="text-[13px] font-semibold leading-tight mt-0.5">{t.name}</div>
+                      <div className="text-[10px] opacity-75 mt-0.5">{t.region}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[18px] font-semibold tabular leading-none">${t.revenueOpp.toFixed(1)}M</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 mt-3 text-[10px]">
+                    <div>
+                      <div className="opacity-70">Units</div>
+                      <div className="font-semibold tabular">{(t.installedUnits/1000).toFixed(0)}K</div>
+                    </div>
+                    <div>
+                      <div className="opacity-70">Unknown</div>
+                      <div className="font-semibold tabular">{(t.unknownUnits/1000).toFixed(0)}K</div>
+                    </div>
+                    <div>
+                      <div className="opacity-70">At-Risk</div>
+                      <div className="font-semibold tabular">{(t.atRiskUnits/1000).toFixed(1)}K</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 text-[11px] text-slate-500">
+            Territories ranked by combined signal: installed base, recoverable unknown history, at-risk units, and lapsed contract density.
+            <span className="text-slate-800 font-semibold"> Southern California + Northeast Corridor + Dallas-Fort Worth</span> together represent 44% of the Year 1 opportunity.
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Contract Recovery" right="lapsed → active" className="col-span-4">
+          <div className="space-y-3 text-[12px]">
+            <div className="flex items-baseline justify-between">
+              <span className="text-slate-600">Addressable Contracts</span>
+              <span className="tabular font-semibold">200,000</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-slate-600">Expired / Lapsed</span>
+              <span className="tabular font-semibold">20%</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-slate-600">Conversion Assumption</span>
+              <span className="tabular font-semibold">5%</span>
+            </div>
+            <div className="flex items-baseline justify-between pt-2 border-t border-slate-100">
+              <span className="text-slate-600">New Contracts</span>
+              <span className="tabular font-semibold text-carrier-blue">10,000</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-slate-600">Avg Contract Value</span>
+              <span className="tabular font-semibold">$500</span>
+            </div>
+            <div className="flex items-baseline justify-between pt-2 border-t border-slate-100">
+              <span className="text-slate-900 font-semibold">Revenue Opportunity</span>
+              <span className="tabular font-semibold text-emerald-700 text-[16px]">$5.0M</span>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2">Top Recovery Accounts</div>
+            <ul className="space-y-1 text-[12px]">
+              {accountRanked.slice(0, 4).filter(a => a.contract === 'Lapsed').map(a => (
+                <li key={a.id} className="flex items-center justify-between">
+                  <span className="text-slate-700 truncate">{a.name}</span>
+                  <span className="tabular font-semibold text-slate-900 shrink-0 ml-2">${a.revenueK}K</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Dealer benchmark + delivery chart */}
+      <div className="grid grid-cols-12 gap-4">
+        <SectionCard title="Dealer Benchmark" right="ranked by opportunity" className="col-span-8">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                  <th className="pl-5 pr-3 py-2">#</th>
+                  <th className="px-3 py-2">Dealer</th>
+                  <th className="px-3 py-2 text-right">First-Time Fix</th>
+                  <th className="px-3 py-2 text-right">Repeat Visit</th>
+                  <th className="px-3 py-2 text-right">Avg Completion</th>
+                  <th className="px-3 py-2 text-right">Parts Readiness</th>
+                  <th className="px-3 py-2 text-right">Attach Rate</th>
+                  <th className="pl-3 pr-5 py-2">Signal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedDealers.map(d => {
+                  const underperforming = d.partsReadiness < 65;
+                  const highOpp = d.rank <= 3;
+                  return (
+                    <tr key={d.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                      <td className="pl-5 pr-3 py-3 text-slate-500 tabular">{d.rank}</td>
+                      <td className="px-3 py-3">
+                        <div className="font-semibold text-slate-900">{d.name}</div>
+                        <div className="text-[11px] text-slate-500">{d.territory} · {d.id}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular">
+                        <span className={d.firstTimeFix < 70 ? 'text-rose-700 font-semibold' : d.firstTimeFix < 75 ? 'text-amber-800' : 'text-slate-800'}>
+                          {d.firstTimeFix}%
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular text-slate-600">{d.repeatVisit}%</td>
+                      <td className="px-3 py-3 text-right tabular">{d.avgCompletion}d</td>
+                      <td className="px-3 py-3 text-right tabular">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${d.partsReadiness < 60 ? 'bg-rose-500' : d.partsReadiness < 70 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${d.partsReadiness}%` }}/>
+                          </div>
+                          <span className="font-semibold">{d.partsReadiness}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right tabular">{d.attachRate}%</td>
+                      <td className="pl-3 pr-5 py-3">
+                        {underperforming && highOpp ? <Pill className="bg-rose-50 text-rose-700 ring-rose-200">high opp · underperforming</Pill>
+                          : d.partsReadiness >= 70 ? <Pill className="bg-emerald-50 text-emerald-700 ring-emerald-200">benchmark</Pill>
+                          : <Pill className="bg-amber-50 text-amber-800 ring-amber-200">improvement area</Pill>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Dealer Delivery Performance" right="days · avg completion" className="col-span-4">
+          <div className="h-[260px] -ml-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={deliveryByDealer} layout="vertical" margin={{ top: 4, right: 20, left: 0, bottom: 4 }}>
+                <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#334155' }} axisLine={false} tickLine={false} width={75} />
+                <Tooltip formatter={(v, n) => n === 'time' ? [`${v}d`, 'Avg Completion'] : [`${v}`, 'Parts Readiness']} cursor={{ fill: '#f1f5f9' }} />
+                <Bar dataKey="time" fill="#1a3d7a" radius={[0, 3, 3, 0]} barSize={14} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-100">
+            Best benchmark: <span className="font-semibold text-slate-700">Peachtree Comfort Group</span> at 2.4d. Opportunity gap: <span className="font-semibold text-rose-700">SunState Field Solutions</span> at 3.6d — 50% longer.
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Account opportunity ranking */}
+      <SectionCard title="Account Opportunity Ranking" right="prioritized for commercial outreach">
+        <div className="overflow-x-auto -mx-5">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                <th className="pl-5 pr-3 py-2">#</th>
+                <th className="px-3 py-2">Account</th>
+                <th className="px-3 py-2">Segment</th>
+                <th className="px-3 py-2 text-right">Units</th>
+                <th className="px-3 py-2 text-right">Unknown</th>
+                <th className="px-3 py-2">Contract</th>
+                <th className="px-3 py-2 text-right">Upgrade Candidates</th>
+                <th className="px-3 py-2 text-right">Revenue Potential</th>
+                <th className="pl-3 pr-5 py-2">Signal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accountRanked.slice(0, 6).map((a, i) => (
+                <tr key={a.id} className="border-t border-slate-100 hover:bg-slate-50/60">
+                  <td className="pl-5 pr-3 py-3 text-slate-500 tabular">{i + 1}</td>
+                  <td className="px-3 py-3">
+                    <div className="font-semibold text-slate-900">{a.name}</div>
+                    <div className="text-[11px] text-slate-500">{a.territory}</div>
+                  </td>
+                  <td className="px-3 py-3 text-slate-700">{a.segment}</td>
+                  <td className="px-3 py-3 text-right tabular">{a.units}</td>
+                  <td className="px-3 py-3 text-right tabular text-slate-500">{a.unknown}</td>
+                  <td className="px-3 py-3"><Pill className={contractColor(a.contract)}>{a.contract}</Pill></td>
+                  <td className="px-3 py-3 text-right tabular">{a.upgradeCandidates}</td>
+                  <td className="px-3 py-3 text-right tabular font-semibold text-slate-900">${a.revenueK}K</td>
+                  <td className="pl-3 pr-5 py-3 text-[11px]">
+                    {a.contract === 'Lapsed' && a.unknown > 25 ? <span className="text-rose-700 font-semibold">lapsed + paper history</span>
+                      : a.contract === 'Lapsed' ? <span className="text-amber-800 font-semibold">contract recovery</span>
+                      : a.unknown > 20 ? <span className="text-sky-700 font-semibold">recover then upgrade</span>
+                      : <span className="text-emerald-700 font-semibold">retention priority</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · DISPATCH COPILOT
+============================================================ */
+const DispatchPage = () => {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const visit = DATA.dispatches[selectedIdx];
+  const unit = DATA.units.find(u => u.id === visit.unitId);
+  const acct = DATA.accounts.find(a => a.name === visit.account);
+  const dealer = DATA.dealers.find(d => d.id === visit.dealer);
+
+  return (
+    <div className="px-6 py-5">
+      <div className="grid grid-cols-12 gap-4">
+
+        {/* LEFT: Scheduled visits */}
+        <div className="col-span-3">
+          <div className="bg-white ring-1 ring-slate-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 hairline">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Tomorrow's Visits</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Tuesday · April 21 · 5 scheduled</div>
+            </div>
+            <ul className="divide-y divide-slate-100">
+              {DATA.dispatches.map((v, i) => {
+                const sel = i === selectedIdx;
+                return (
+                  <li key={i}>
+                    <button onClick={() => setSelectedIdx(i)} className={`w-full text-left px-4 py-3 transition-colors ${sel ? 'bg-carrier-blue/[0.06]' : 'hover:bg-slate-50'}`}>
+                      <div className="flex items-baseline justify-between">
+                        <div className={`text-[12px] font-semibold tabular ${sel ? 'text-carrier-blue' : 'text-slate-900'}`}>{v.time}</div>
+                        <Pill className={riskColor(v.risk)}>{v.risk}</Pill>
+                      </div>
+                      <div className="text-[11px] text-slate-700 mt-1 truncate">{v.account}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{v.unitId} · {v.tech}</div>
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="text-[10px] text-slate-500">Success prob.</div>
+                        <div className={`text-[11px] tabular font-semibold ${v.successProb < 65 ? 'text-rose-700' : v.successProb < 75 ? 'text-amber-700' : 'text-emerald-700'}`}>{v.successProb}%</div>
+                      </div>
+                      <div className="h-1 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                        <div className={`h-full rounded-full ${v.successProb < 65 ? 'bg-rose-500' : v.successProb < 75 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${v.successProb}%` }}/>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="px-4 py-3 border-t border-slate-100 text-[11px] text-slate-500">
+              3 staged kits · 1 parts risk · 2 preventive
+            </div>
+          </div>
+        </div>
+
+        {/* CENTER: Visit detail */}
+        <div className="col-span-6 space-y-4">
+
+          {/* Header card */}
+          <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5">
+            <div className="flex items-start gap-4">
+              <div className={`h-12 w-12 rounded-md ${visit.risk === 'Critical' ? 'bg-rose-50 text-rose-600' : visit.risk === 'High' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'} flex items-center justify-center`}>
+                <Icon name="navigation" className="w-6 h-6"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <h2 className="text-[18px] font-semibold text-slate-900">{visit.time} · {visit.account}</h2>
+                  <Pill className={riskColor(visit.risk)}>{visit.risk}</Pill>
+                </div>
+                <div className="text-[12px] text-slate-600 mt-1">{visit.visitType}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{(dealer || {}).name} · Tech: {visit.tech}</div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Predicted Window</div>
+                <div className="text-[15px] font-semibold tabular text-slate-900 mt-1">2–4 hrs</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">80% confidence</div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-x-6 gap-y-3 mt-5 pt-5 border-t border-slate-100 text-[12px]">
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Unit</div><div className="text-slate-900 mt-0.5 tabular font-semibold">{visit.unitId}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Health Score</div><div className={`mt-0.5 tabular font-semibold ${visit.health < 50 ? 'text-rose-700' : visit.health < 65 ? 'text-amber-700' : 'text-sky-700'}`}>{visit.health}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Product</div><div className="text-slate-900 mt-0.5">{(unit || {}).family}</div></div>
+              <div><div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Contract</div><div className="mt-0.5">{unit ? <Pill className={contractColor(unit.contract)}>{unit.contract}</Pill> : '—'}</div></div>
+            </div>
+          </div>
+
+          {/* Recent service events */}
+          <SectionCard title="Recent Service Events" right={`${visit.unitId} · last 3`}>
+            <ul className="-mx-5 -my-5 divide-y divide-slate-100">
+              {DATA.heroUnitHistory.slice(-3).reverse().map((h, i) => (
+                <li key={i} className="px-5 py-3 flex items-start gap-3">
+                  <div className="text-[11px] tabular text-slate-500 w-20 pt-0.5">{h.date}</div>
+                  <div className="h-1.5 w-1.5 rounded-full bg-carrier-blue mt-2 shrink-0"/>
+                  <div className="flex-1">
+                    <div className="text-[12px] text-slate-900 font-medium">{h.event}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">{h.source} · <span className="italic">{h.insight}</span></div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {/* Current fault indicators */}
+          <SectionCard title="Current Fault Indicators" right="sensor + history signal">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-md bg-rose-50 ring-1 ring-rose-200">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-rose-700 font-semibold">Fault E27</div>
+                <div className="text-[12px] text-slate-900 font-semibold mt-1">Refrigerant Pressure Low</div>
+                <div className="text-[11px] text-slate-600 mt-1">detected 4h ago · confidence 84%</div>
+              </div>
+              <div className="p-3 rounded-md bg-amber-50 ring-1 ring-amber-200">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-amber-800 font-semibold">Fault E08</div>
+                <div className="text-[12px] text-slate-900 font-semibold mt-1">Fan Speed Out of Range</div>
+                <div className="text-[11px] text-slate-600 mt-1">recurring · last seen 2025-10-16</div>
+              </div>
+              <div className="p-3 rounded-md bg-slate-50 ring-1 ring-slate-200">
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-600 font-semibold">Thermal Drift</div>
+                <div className="text-[12px] text-slate-900 font-semibold mt-1">Product Temp +3.4°F</div>
+                <div className="text-[11px] text-slate-600 mt-1">trending · high-value downtime risk</div>
+              </div>
+            </div>
+          </SectionCard>
+
+          {/* Pre-dispatch brief output */}
+          <SectionCard title="Customer Communication Draft" right="auto-generated · editable">
+            <div className="bg-slate-50 rounded-md p-4 text-[12px] text-slate-700 leading-relaxed border-l-2 border-carrier-blue">
+              <div className="text-[11px] font-semibold text-slate-500 mb-2">To: Pacific Cold Storage Network · Operations</div>
+              We have your emergency service visit confirmed for tomorrow, 8:00 AM PDT. Technician Miguel Santos (Pacific HVAC Alliance) will arrive with a staged parts kit based on your unit's service history. Expected completion window: 2–4 hours with 80% confidence. Should the issue require escalation, we'll route a second technician by 11:00 AM to avoid a next-day return visit. You'll receive an on-site arrival update at 7:45 AM.
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* RIGHT: AI dispatch brief */}
+        <div className="col-span-3 space-y-4">
+
+          <div className="bg-carrier-navy2 text-white rounded-lg p-4">
+            <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-carrier-gold font-semibold">
+              <Icon name="zap" className="w-3.5 h-3.5"/>
+              AI Dispatch Brief
+            </div>
+            <div className="text-[12px] text-slate-200 mt-2.5 leading-relaxed">
+              Unit {visit.unitId} shows a <span className="text-white font-semibold">critical health score</span> driven by repeat cooling instability, likely condenser fan wear, and probable refrigerant-side issue. Pre-stage fan motor assembly, leak test kit, and valve service kit before dispatch.
+            </div>
+            <div className="mt-3 pt-3 border-t border-carrier-navy3 space-y-2 text-[11px]">
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-400">Likely Issue</span>
+                <span className="text-white font-semibold text-right">Fan + refrigerant</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-400">Second-Trip Risk</span>
+                <span className="text-rose-300 font-semibold">38%</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-400">With Staged Kit</span>
+                <span className="text-emerald-300 font-semibold">11%</span>
+              </div>
+              <div className="flex items-baseline justify-between">
+                <span className="text-slate-400">Completion Window</span>
+                <span className="text-white font-semibold">2–4 hrs</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Recommended parts kit */}
+          <SectionCard title="Pre-Dispatch Parts Kit" right="staged at regional">
+            <ul className="-mx-5 -my-5 divide-y divide-slate-100">
+              {DATA.heroPartsKit.map((p, i) => (
+                <li key={i} className="px-5 py-3">
+                  <div className="flex items-baseline justify-between">
+                    <div className="text-[12px] font-semibold text-slate-900 tabular">{p.part}</div>
+                    <Pill className={p.urgency === 'High' ? 'bg-rose-50 text-rose-700 ring-rose-200' : p.urgency === 'Medium' ? 'bg-amber-50 text-amber-800 ring-amber-200' : 'bg-slate-50 text-slate-600 ring-slate-200'}>{p.urgency}</Pill>
+                  </div>
+                  <div className="text-[12px] text-slate-700 mt-0.5">{p.desc}</div>
+                  <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5">
+                    <span className={`h-1.5 w-1.5 rounded-full ${p.availability.includes('Limited') ? 'bg-amber-500' : 'bg-emerald-500'}`}/>
+                    {p.availability}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+
+          {/* Actions */}
+          <SectionCard title="Actions">
+            <ul className="space-y-2">
+              {[
+                { label: 'Confirm parts kit + send to tech', primary: true },
+                { label: 'Escalate risk to dealer manager',  primary: false },
+                { label: 'Notify dealer manager',           primary: false },
+                { label: 'Update customer ETA',             primary: false },
+              ].map((a, i) => (
+                <li key={i}>
+                  <button className={`w-full text-left flex items-start gap-3 px-3 py-2.5 rounded-md ring-1 transition-colors ${a.primary ? 'bg-carrier-blue text-white ring-carrier-blue hover:bg-carrier-blue/90' : 'bg-white text-slate-800 ring-slate-200 hover:bg-slate-50'}`}>
+                    <Icon name="check" className={`w-4 h-4 mt-0.5 shrink-0 ${a.primary ? 'text-white' : 'text-carrier-blue'}`}/>
+                    <div className="text-[12px] font-semibold flex-1">{a.label}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </SectionCard>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · ALERTS
+============================================================ */
+const AlertsPage = () => {
+  const [selectedId, setSelectedId] = useState('AL-7001');
+  const a = DATA.alerts.find(x => x.id === selectedId) || DATA.alerts[0];
+  const sevCounts = DATA.alerts.reduce((acc, x) => { acc[x.severity] = (acc[x.severity] || 0) + 1; return acc; }, {});
+
+  return (
+    <div className="px-6 py-5 space-y-5">
+
+      {/* Severity summary */}
+      <div className="grid grid-cols-4 gap-4">
+        <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-md bg-rose-50 flex items-center justify-center">
+            <Icon name="alert" className="w-5 h-5 text-rose-600"/>
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Critical</div>
+            <div className="text-2xl font-semibold tabular text-slate-900 leading-none mt-1">{sevCounts.Critical || 0}</div>
+          </div>
+          <div className="text-[11px] text-rose-700 font-semibold">immediate action</div>
+        </div>
+        <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-md bg-amber-50 flex items-center justify-center">
+            <Icon name="alert" className="w-5 h-5 text-amber-700"/>
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">High</div>
+            <div className="text-2xl font-semibold tabular text-slate-900 leading-none mt-1">{sevCounts.High || 0}</div>
+          </div>
+          <div className="text-[11px] text-amber-800 font-semibold">route + stage</div>
+        </div>
+        <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-md bg-sky-50 flex items-center justify-center">
+            <Icon name="alert" className="w-5 h-5 text-sky-700"/>
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Medium</div>
+            <div className="text-2xl font-semibold tabular text-slate-900 leading-none mt-1">{sevCounts.Medium || 0}</div>
+          </div>
+          <div className="text-[11px] text-sky-700 font-semibold">queue triage</div>
+        </div>
+        <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5 flex items-center gap-4">
+          <div className="h-10 w-10 rounded-md bg-slate-100 flex items-center justify-center">
+            <Icon name="check" className="w-5 h-5 text-slate-600"/>
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">Open · 24h</div>
+            <div className="text-2xl font-semibold tabular text-slate-900 leading-none mt-1">{DATA.alerts.length}</div>
+          </div>
+          <div className="text-[11px] text-slate-600">vs. 38 resolved</div>
+        </div>
+      </div>
+
+      {/* Queue + detail */}
+      <div className="grid grid-cols-12 gap-4">
+
+        {/* Queue */}
+        <SectionCard title="Active Alert Queue" right={`${DATA.alerts.length} open · sorted by severity`} className="col-span-7">
+          <div className="overflow-x-auto -mx-5">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
+                  <th className="pl-5 pr-3 py-2">Alert</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Territory</th>
+                  <th className="px-3 py-2">Severity</th>
+                  <th className="px-3 py-2">Owner</th>
+                  <th className="pl-3 pr-5 py-2">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DATA.alerts.map(al => {
+                  const sel = al.id === selectedId;
+                  return (
+                    <tr key={al.id} onClick={() => setSelectedId(al.id)} className={`border-t border-slate-100 cursor-pointer ${sel ? 'bg-carrier-blue/[0.05]' : 'hover:bg-slate-50/60'}`}>
+                      <td className="pl-5 pr-3 py-3">
+                        <div className={`tabular font-semibold ${sel ? 'text-carrier-blue' : 'text-slate-900'}`}>{al.id}</div>
+                        <div className="text-[11px] text-slate-500 tabular">{al.unit}</div>
+                      </td>
+                      <td className="px-3 py-3 text-slate-900">
+                        <div>{al.type}</div>
+                        <div className="text-[11px] text-slate-500">{al.account}</div>
+                      </td>
+                      <td className="px-3 py-3 text-slate-700">{al.territory}</td>
+                      <td className="px-3 py-3"><Pill className={severityColor(al.severity)}>{al.severity}</Pill></td>
+                      <td className="px-3 py-3 text-slate-700">{al.owner}</td>
+                      <td className="pl-3 pr-5 py-3 text-[11px] text-slate-500 tabular">{al.created}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+
+        {/* Alert detail drawer */}
+        <div className="col-span-5 space-y-4">
+          <div className="bg-white ring-1 ring-slate-200 rounded-lg p-5">
+            <div className="flex items-start gap-4">
+              <div className="h-11 w-11 rounded-md bg-rose-50 flex items-center justify-center shrink-0">
+                <Icon name="alert" className="w-5 h-5 text-rose-600"/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="text-[14px] font-semibold text-slate-900 tabular">{a.id}</div>
+                  <Pill className={severityColor(a.severity)}>{a.severity}</Pill>
+                </div>
+                <div className="text-[13px] text-slate-800 mt-1">{a.type}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{a.account} · {a.territory}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4 text-[12px]">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Linked Unit</div>
+                <div className="text-slate-900 tabular font-semibold mt-0.5">{a.unit}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Owner</div>
+                <div className="text-slate-900 font-medium mt-0.5">{a.owner}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Created</div>
+                <div className="text-slate-900 tabular mt-0.5">{a.created}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">Status</div>
+                <div className="text-slate-900 font-medium mt-0.5">{a.status}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2">Why this fired</div>
+              <div className="text-[12px] text-slate-700 leading-relaxed">
+                {a.id === 'AL-7001'
+                  ? 'Unit health score dropped below 50 following three consecutive cooling performance events in the last 10 days. Unit is on a lapsed service contract with a repeat-fault history consistent with fleet pattern FP-001.'
+                  : 'Triggered by the system-defined threshold for this alert type based on the unit or fleet context.'}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold mb-2">Evidence</div>
+              <ul className="text-[12px] text-slate-700 space-y-1.5">
+                <li className="flex items-start gap-2"><span className="h-1 w-1 rounded-full bg-slate-400 mt-2"/>Health score: 45 (threshold 50)</li>
+                <li className="flex items-start gap-2"><span className="h-1 w-1 rounded-full bg-slate-400 mt-2"/>3 performance events in 10 days</li>
+                <li className="flex items-start gap-2"><span className="h-1 w-1 rounded-full bg-slate-400 mt-2"/>Fan speed anomaly detected 4h ago</li>
+                <li className="flex items-start gap-2"><span className="h-1 w-1 rounded-full bg-slate-400 mt-2"/>Fits FP-001 recurring pattern signature</li>
+                <li className="flex items-start gap-2"><span className="h-1 w-1 rounded-full bg-slate-400 mt-2"/>Service contract status: Lapsed</li>
+              </ul>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2">
+              <button className="px-3 py-1.5 bg-carrier-blue text-white text-[12px] font-semibold rounded">{a.next.charAt(0).toUpperCase() + a.next.slice(1)}</button>
+              <button className="px-3 py-1.5 bg-white text-slate-700 ring-1 ring-slate-200 text-[12px] font-semibold rounded">Assign owner</button>
+              <button className="px-3 py-1.5 bg-white text-slate-700 ring-1 ring-slate-200 text-[12px] font-semibold rounded">Snooze</button>
+            </div>
+          </div>
+
+          {/* Routing / escalation */}
+          <SectionCard title="Routing & Escalation">
+            <ol className="space-y-3 text-[12px]">
+              {[
+                { t: '0 min', who: 'Dealer Manager · Pacific HVAC Alliance', action: 'Alert delivered via SNS + Salesforce Field Service mobile' },
+                { t: '+15 min', who: 'Regional Service Manager', action: 'CC if no acknowledgement' },
+                { t: '+60 min', who: 'Territory VP', action: 'Escalated on no action' },
+                { t: 'auto',   who: 'Quality Lead',  action: 'Tagged if alert fits active fleet pattern (FP-001)' },
+              ].map((step, i) => (
+                <li key={i} className="flex gap-3">
+                  <div className="h-5 w-12 shrink-0 text-right text-[11px] tabular text-slate-500 pt-0.5">{step.t}</div>
+                  <div className="relative">
+                    <div className="h-2 w-2 rounded-full bg-carrier-blue mt-2"/>
+                    {i < 3 && <div className="absolute left-1/2 top-4 -translate-x-1/2 h-[calc(100%+12px)] w-px bg-slate-200"/>}
+                  </div>
+                  <div className="flex-1 pb-1">
+                    <div className="font-semibold text-slate-900">{step.who}</div>
+                    <div className="text-[11px] text-slate-600 mt-0.5">{step.action}</div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </SectionCard>
+        </div>
+      </div>
+
+    </div>
+  );
+};
+
+/* ============================================================
+   PAGE · LEADERSHIP PLACEHOLDERS (Q2 release)
+============================================================ */
+const ComingSoon = ({ title, copy, items }) => (
+  <div className="px-6 py-5 space-y-5">
+    <div className="hero-gradient rounded-xl p-5 text-white flex items-start gap-5">
+      <div className="h-11 w-11 rounded-lg bg-carrier-gold/15 ring-1 ring-carrier-gold/40 flex items-center justify-center shrink-0">
+        <Icon name="bar" className="w-5 h-5 text-carrier-gold"/>
+      </div>
+      <div className="flex-1">
+        <div className="text-[17px] font-semibold">{title}</div>
+        <div className="text-slate-300 text-[13px] leading-relaxed mt-1 max-w-3xl">{copy}</div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Release</div>
+        <div className="text-[15px] font-semibold mt-1">Q2 2026</div>
+      </div>
+    </div>
+    <div className="grid grid-cols-3 gap-4">
+      {items.map((it, i) => (
+        <div key={i} className="bg-white ring-1 ring-slate-200 rounded-lg p-5">
+          <div className="text-[10px] uppercase tracking-[0.08em] text-slate-500 font-semibold">{it.label}</div>
+          <div className="text-[14px] font-semibold text-slate-900 mt-2 leading-snug">{it.title}</div>
+          <div className="text-[12px] text-slate-600 mt-2 leading-relaxed">{it.copy}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ============================================================
+   APP
+============================================================ */
+const App = () => {
+  const [page, setPage] = useState('exec');
+  const pages = {
+    exec:       <ExecPage />,
+    unit:       <UnitPage />,
+    fleet:      <FleetPage />,
+    dealer:     <DealerPage />,
+    dispatch:   <DispatchPage />,
+    alerts:     <AlertsPage />,
+    recovery:   <DataRecoveryPage />,
+    review:     <ComingSoon
+                   title="Executive Review"
+                   copy="Monthly aftermarket performance review for Carrier leadership — value realized vs. plan, fleet quality signals, dealer momentum, and next-quarter forecast."
+                   items={[
+                     { label: 'Cadence',   title: 'Monthly + quarterly', copy: 'Auto-generated narrative on the first business day of each month.' },
+                     { label: 'Audience',  title: 'CEO, CFO, COO, SVPs', copy: 'Anchored on the $175.3M Year 1 plan with variance commentary.' },
+                     { label: 'Format',    title: 'Read-ahead + live',   copy: 'Pre-meeting PDF + interactive dashboard with drill-down.' },
+                   ]}
+                 />,
+    governance: <ComingSoon
+                   title="Policy Governance"
+                   copy="Human experts govern the thresholds that drive every alert, parts kit, and contract recommendation. The system supports decisioning — it does not remove accountability."
+                   items={[
+                     { label: 'Adjudication',  title: 'Confidence + risk thresholds', copy: 'Auto-action thresholds reviewed quarterly by service ops + risk.' },
+                     { label: 'Anomaly',       title: 'Sensitivity windows',          copy: 'Lookback periods + variance triggers reviewed by quality.' },
+                     { label: 'Audit trail',   title: 'Every change logged',          copy: 'Versioned approvals, governance notes, and rollback path.' },
+                   ]}
+                 />,
+  };
+  return (
+    <div className="min-h-screen">
+      <Sidebar page={page} setPage={setPage} />
+      <div className="ml-[232px]">
+        <TopBar page={page} />
+        <main>{pages[page] || <Placeholder title="Overview" />}</main>
+      </div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
