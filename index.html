@@ -55,7 +55,7 @@
 <div id="root"></div>
 
 <script type="text/babel" data-presets="react">
-const { useState, useMemo, Fragment } = React;
+const { useState, useMemo, useEffect, Fragment } = React;
 const { LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } = Recharts;
 
 /* ============================================================
@@ -197,7 +197,7 @@ const contractColor = (c) => ({
    ATOMIC COMPONENTS
 ============================================================ */
 const Pill = ({ children, className = '' }) => (
-  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded ring-1 ring-inset ${className}`}>{children}</span>
+  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded ring-1 ring-inset whitespace-nowrap ${className}`}>{children}</span>
 );
 
 const KpiCard = ({ label, value, delta, deltaLabel, positive = true, sub }) => (
@@ -681,8 +681,8 @@ const UnitPage = () => {
                 <Icon name="cpu" className={`w-6 h-6 ${u.risk === 'Critical' ? 'text-rose-600' : u.risk === 'High' ? 'text-amber-700' : 'text-sky-700'}`}/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-[18px] font-semibold text-slate-900">{u.id}</h2>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-[18px] font-semibold text-slate-900 whitespace-nowrap">{u.id}</h2>
                   <Pill className={riskColor(u.risk)}>{u.risk}</Pill>
                   <Pill className={contractColor(u.contract)}>Contract: {u.contract}</Pill>
                   <Pill className="bg-slate-100 text-slate-700 ring-slate-200">Warranty: {u.warranty}</Pill>
@@ -756,20 +756,17 @@ const UnitPage = () => {
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="text-left text-[10px] uppercase tracking-[0.06em] text-slate-500 font-semibold">
-                    <th className="pl-5 pr-3 py-2">Component</th>
-                    <th className="px-3 py-2">Age / Condition</th>
-                    <th className="px-3 py-2">Replacement History</th>
-                    <th className="px-3 py-2 text-right">Risk</th>
-                    <th className="px-3 py-2 text-right">Confidence</th>
-                    <th className="pl-3 pr-5 py-2">Recommended Action</th>
+                    <th className="pl-5 pr-3 py-2 whitespace-nowrap">Component</th>
+                    <th className="px-3 py-2 whitespace-nowrap">Age / Condition</th>
+                    <th className="px-3 py-2 text-right whitespace-nowrap">Risk</th>
+                    <th className="pl-3 pr-5 py-2 whitespace-nowrap">Recommended Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {DATA.heroComponents.map((c, i) => (
                     <tr key={i} className="border-t border-slate-100">
-                      <td className="pl-5 pr-3 py-3 font-semibold text-slate-900">{c.component}</td>
+                      <td className="pl-5 pr-3 py-3 font-semibold text-slate-900 whitespace-nowrap">{c.component}</td>
                       <td className="px-3 py-3 text-slate-700">{c.age}</td>
-                      <td className="px-3 py-3 text-slate-600">{c.history}</td>
                       <td className="px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="w-12 h-1.5 bg-slate-100 rounded-full overflow-hidden">
@@ -778,7 +775,6 @@ const UnitPage = () => {
                           <span className={`tabular font-semibold ${c.risk >= 70 ? 'text-rose-700' : c.risk >= 50 ? 'text-amber-800' : 'text-sky-800'}`}>{c.risk}%</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-right tabular text-slate-600">{c.confidence}%</td>
                       <td className="pl-3 pr-5 py-3 text-slate-700">{c.action}</td>
                     </tr>
                   ))}
@@ -1685,8 +1681,8 @@ const DispatchPage = () => {
                 <Icon name="navigation" className="w-6 h-6"/>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <h2 className="text-[18px] font-semibold text-slate-900">{visit.time} · {visit.account}</h2>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-[18px] font-semibold text-slate-900 whitespace-nowrap">{visit.time} · {visit.account}</h2>
                   <Pill className={riskColor(visit.risk)}>{visit.risk}</Pill>
                 </div>
                 <div className="text-[12px] text-slate-600 mt-1">{visit.visitType}</div>
@@ -1904,7 +1900,7 @@ const AlertsPage = () => {
                   const sel = al.id === selectedId;
                   return (
                     <tr key={al.id} onClick={() => setSelectedId(al.id)} className={`border-t border-slate-100 cursor-pointer ${sel ? 'bg-carrier-blue/[0.05]' : 'hover:bg-slate-50/60'}`}>
-                      <td className="pl-5 pr-3 py-3">
+                      <td className="pl-5 pr-3 py-3 whitespace-nowrap">
                         <div className={`tabular font-semibold ${sel ? 'text-carrier-blue' : 'text-slate-900'}`}>{al.id}</div>
                         <div className="text-[11px] text-slate-500 tabular">{al.unit}</div>
                       </td>
@@ -2052,6 +2048,7 @@ const ComingSoon = ({ title, copy, items }) => (
 ============================================================ */
 const App = () => {
   const [page, setPage] = useState('exec');
+  useEffect(() => { window.scrollTo(0, 0); }, [page]);
   const pages = {
     exec:       <ExecPage />,
     unit:       <UnitPage />,

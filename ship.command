@@ -17,8 +17,10 @@ SLUG=$(basename "$PWD")
 
 if [ -f "$MANIFEST" ]; then
   VERCEL_APP=$(python3 -c "import json; m=json.load(open('$MANIFEST')); print(m['projects'].get('$SLUG',{}).get('vercelApp',''))" 2>/dev/null)
+  VERCEL_URL=$(python3 -c "import json; m=json.load(open('$MANIFEST')); print(m['projects'].get('$SLUG',{}).get('vercelUrl',''))" 2>/dev/null)
 fi
 VERCEL_APP=${VERCEL_APP:-$SLUG}
+VERCEL_URL=${VERCEL_URL:-https://$VERCEL_APP.vercel.app}
 
 echo ""
 echo "═══════════════════════════════════════════"
@@ -41,7 +43,9 @@ fi
 
 # Stage + commit if there are changes
 if [ -z "$(git status --porcelain)" ]; then
-  echo "ℹ No file changes. Will still check latest Vercel deploy."
+  echo "ℹ No file changes. Nothing to ship."
+  read -p "Press return to close..."
+  exit 0
 else
   echo "→ Staging..."
   git add .
@@ -49,8 +53,9 @@ else
   git -c user.email='jeff.mills@toptal.com' -c user.name='Jeff Mills' commit -m "$MSG"
 fi
 
-SHA=$(git rev-parse --short HEAD)
-echo "→ HEAD: $SHA"
+SHORT_SHA=$(git rev-parse --short HEAD)
+FULL_SHA=$(git rev-parse HEAD)
+echo "→ HEAD: $SHORT_SHA"
 
 # Push if ahead of remote
 AHEAD=$(git rev-list --count @{u}..HEAD 2>/dev/null || echo 0)
@@ -61,49 +66,49 @@ else
   echo "ℹ Already in sync with origin."
 fi
 
-# Poll Vercel
+# ─── Poll Vercel — wait for a deploy of OUR SHA to reach READY ───
 echo ""
-echo "→ Waiting for Vercel deploy..."
+echo "→ Waiting for Vercel to deploy $SHORT_SHA..."
 START=$(date +%s)
-TIMEOUT=180
+TIMEOUT=300
 LAST_STATE=""
+WAITED_FOR_SHA=0
 
 while true; do
   RESPONSE=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-    "https://api.vercel.com/v6/deployments?app=$VERCEL_APP&limit=1")
+    "https://api.vercel.com/v6/deployments?app=$VERCEL_APP&limit=10")
 
-  STATE=$(echo "$RESPONSE" | python3 -c "
-import sys, json
+  PARSED=$(echo "$RESPONSE" | TARGET_SHA="$FULL_SHA" python3 -c "
+import sys, json, os
+target = os.environ.get('TARGET_SHA','')
 try:
-    d = json.load(sys.stdin); deps = d.get('deployments') or []
-    print(deps[0].get('state','UNKNOWN') if deps else 'NONE')
-except: print('PARSE_ERR')
+    d = json.load(sys.stdin)
+    deps = d.get('deployments') or []
+    # Look for a deploy whose commit SHA matches ours
+    for dep in deps:
+        sha = dep.get('meta',{}).get('githubCommitSha','')
+        if sha == target:
+            print(f\"{dep.get('state','UNKNOWN')}|{dep.get('url','')}|{sha[:7]}\")
+            break
+    else:
+        print('NOTFOUND||')
+except Exception as e:
+    print(f'PARSE_ERR||{e}')
 " 2>/dev/null)
 
-  URL=$(echo "$RESPONSE" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin); deps = d.get('deployments') or []
-    print(deps[0].get('url','') if deps else '')
-except: print('')
-" 2>/dev/null)
-
-  DEP_SHA=$(echo "$RESPONSE" | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin); deps = d.get('deployments') or []
-    s = deps[0].get('meta',{}).get('githubCommitSha','') if deps else ''
-    print(s[:7])
-except: print('')
-" 2>/dev/null)
-
+  STATE=$(echo "$PARSED" | cut -d'|' -f1)
+  URL=$(echo "$PARSED" | cut -d'|' -f2)
+  DEP_SHA=$(echo "$PARSED" | cut -d'|' -f3)
   ELAPSED=$(($(date +%s) - START))
 
   case "$STATE" in
     READY)
       echo ""
-      echo "✓ READY  https://$URL"
-      echo "  commit: $DEP_SHA  time: ${ELAPSED}s"
+      echo "✓ READY"
+      echo "  Production: $VERCEL_URL"
+      echo "  Deployment: https://$URL"
+      echo "  Commit:     $DEP_SHA  (matches push)"
+      echo "  Time:       ${ELAPSED}s"
       read -p "Press return to close..."
       exit 0
       ;;
@@ -112,6 +117,15 @@ except: print('')
       echo "✗ $STATE — see https://vercel.com/dashboard"
       read -p "Press return to close..."
       exit 1
+      ;;
+    NOTFOUND)
+      if [ "$LAST_STATE" != "NOTFOUND" ]; then
+        echo "  Waiting for Vercel to pick up the push... (${ELAPSED}s)"
+        LAST_STATE="NOTFOUND"
+      fi
+      ;;
+    PARSE_ERR)
+      echo "  API parse error (${ELAPSED}s) — retrying"
       ;;
     *)
       if [ "$STATE" != "$LAST_STATE" ]; then
@@ -124,9 +138,14 @@ except: print('')
   if [ $ELAPSED -gt $TIMEOUT ]; then
     echo ""
     echo "⏱ Timeout after ${TIMEOUT}s. Last state: $STATE"
+    echo "  Check https://vercel.com/dashboard"
+    echo ""
+    echo "  Debug: last API response:"
+    echo "$RESPONSE" | head -c 500
+    echo ""
     read -p "Press return to close..."
     exit 1
   fi
 
-  sleep 3
+  sleep 4
 done
